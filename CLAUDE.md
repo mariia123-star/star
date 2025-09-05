@@ -1,0 +1,258 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Language Requirements
+
+**ВАЖНО**: Все ответы, комментарии, сообщения об ошибках, диалоги и любое другое общение с пользователем должно быть на русском языке. Код и технические термины остаются на английском.
+
+## Common Development Commands
+
+```bash
+# Development
+npm install           # Install dependencies
+npm run dev          # Start dev server (http://localhost:5173)
+npm run preview      # Preview production build
+
+# Build & Quality
+npm run build        # TypeScript check + Vite build (MUST pass before commit)
+npm run lint         # ESLint check (MUST pass before commit)
+npm run format       # Prettier formatting
+npm run format:check # Check formatting without changes
+npx tsc --noEmit     # Type checking only (standalone)
+```
+
+## Pre-commit Checklist
+1. Run `npm run lint` and fix all warnings
+2. Run `npm run format` to ensure consistent formatting
+3. Run `npm run build` and ensure project builds successfully
+4. Follow Conventional Commits format (`feat:`, `fix:`, `chore:`, etc.)
+
+## Architecture Overview
+
+### Tech Stack
+- **Frontend**: React 19.1, TypeScript 5.8 (strict mode), Vite 7.0
+- **UI Library**: Ant Design 5.21 with Vibe design approach
+- **State Management**: TanStack Query 5.59+ (server state), Zustand 5.0+ (auth state)
+- **Backend**: Supabase 2.47+ (PostgreSQL, Auth, Storage, Edge Functions, Realtime WebSocket)
+- **Authentication**: Supabase Auth with OAuth 2.0 (Google, Microsoft) and MFA support
+- **Excel Processing**: xlsx 0.18 library for import/export
+- **Utilities**: Day.js 1.11 for dates
+- **Routing**: React Router DOM 6.27
+- **Development**: ESLint, Prettier, dotenv for environment management
+
+### Feature-Sliced Design (FSD) Structure
+```
+src/
+├── app/          # App-level providers, routing
+├── pages/        # Route pages (main pages, admin/, documents/, references/)
+├── widgets/      # Complex reusable UI blocks (empty - to be populated)
+├── features/     # User interactions, business features (auth/)
+├── entities/     # Business entities and their APIs (chessboard/, documentation/, rates/, etc.)
+├── shared/       # Shared utilities, UI components, types (lib/, types/, ui/)
+├── layout/       # Layout components (MainLayout.tsx)
+├── lib/          # External library configurations (supabase.ts)
+└── components/   # Legacy UI components (ConflictResolutionDialog, DataTable, FileUpload, etc.)
+```
+
+### Key Patterns
+- **Public API**: Each slice exposes through `index.ts`
+- **Imports**: Use path aliases configured in `vite.config.ts` and `tsconfig.app.json`:
+  - `@/` → `./src`
+  - `@/app/` → `./src/app`
+  - `@/pages/` → `./src/pages`
+  - `@/widgets/` → `./src/widgets`
+  - `@/features/` → `./src/features`
+  - `@/entities/` → `./src/entities`
+  - `@/shared/` → `./src/shared`
+- **State**: TanStack Query for server state, Zustand for auth state only
+- **API Files**: Named as `entity-name-api.ts` in `entities/*/api/`
+- **Error Handling**: All Supabase queries must include error handling
+
+## Database Integration
+
+**CRITICAL**: Always reference `supabase/schema.sql` for current database structure.
+
+### Supabase Configuration
+Environment variables required:
+```env
+VITE_SUPABASE_URL=your-supabase-url
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+VITE_STORAGE_BUCKET=your-storage-bucket-url
+```
+
+Configuration: `src/lib/supabase.ts`
+
+### Database Deployment
+Deploy database schema:
+```bash
+psql "$DATABASE_URL" -f supabase/schema.sql
+```
+
+### Core Tables
+- `chessboard` - Main data table for material tracking
+- `chessboard_mapping` - Mapping relationships
+- `entity_comments_mapping` - Universal mapping table for comments to entities
+- `units` - Units of measurement
+- `cost_categories`, `detail_cost_categories` - Cost categorization
+- `location` - Location/localization data
+- `projects`, `blocks` - Project structure
+- `documentation` - Document management
+- `rates` - Rate management with cost categories
+
+### Database Rules
+- All tables MUST include `created_at` and `updated_at` fields
+  - **EXCEPTION**: Mapping/junction tables (many-to-many relationships) should NOT have `created_at` and `updated_at` fields
+- **Primary keys**: All tables use UUID for primary keys (id field)
+- **Mapping table naming**: All mapping/junction tables MUST have `_mapping` suffix
+- **NEVER use RLS (Row Level Security)** - handle auth in application layer
+- Use optimistic locking via `updated_at` timestamp for concurrent edits
+
+### API Pattern
+Standard Supabase query pattern:
+```typescript
+const { data, error } = await supabase
+  .from('table')
+  .select('*, relation:table(*)')
+  .order('created_at', { ascending: false });
+
+if (error) {
+  console.error('Operation failed:', error);
+  throw error;
+}
+```
+
+## Performance Requirements
+- Import 5,000 Excel rows ≤ 30 seconds
+- Render 10,000 rows ≤ 100ms
+- Support 100 concurrent users
+- Latency < 300ms for real-time sync
+- 99.9% uptime target
+- MTTR ≤ 5 minutes
+
+## Critical Guidelines
+
+### MUST DO
+- Run `npm run lint` before committing
+- Run `npm run format` for consistent code style
+- Handle all TypeScript strict mode requirements
+- Use absolute imports with path aliases (@/)
+- Export public APIs through index.ts files
+- Include error handling in all Supabase queries
+- Write **TypeScript only** with strict typing
+- Use functional React components and hooks
+- Data fetching via TanStack Query
+- All tables MUST have sorting and filters in column headers
+
+### NEVER DO
+- Create files unless absolutely necessary
+- Add comments unless explicitly requested
+- Use relative imports (../../../)
+- Commit .env files or secrets
+- Use `any` type in TypeScript
+- Create documentation files proactively
+- Use RLS (Row Level Security)
+- Store secrets or generated artifacts in repository
+
+## UI/UX Guidelines
+- **Mobile-first** design approach
+- **WCAG 2.1 AA** accessibility compliance
+- Modern, responsive UI with Ant Design 5/Vibe design system
+- All tables MUST have sorting and filters in column headers
+- Control elements in table rows should be icon-only (no text)
+- Display page title in header on all new portal pages
+- **Multi-language**: UI is in Russian, maintain Russian labels for user-facing elements
+
+### Filter Components Requirements
+All Select components in filters MUST include:
+- `allowClear` - enables X button to clear selection
+- `showSearch` - enables search by typing
+- `filterOption` - custom filter function for Russian text support
+
+```typescript
+<Select
+  placeholder="Выберите значение"
+  allowClear
+  showSearch
+  filterOption={(input, option) => {
+    const text = (option?.children || option?.label)?.toString() || ""
+    return text.toLowerCase().includes(input.toLowerCase())
+  }}
+>
+  {options.map(item => (
+    <Select.Option key={item.id} value={item.id}>
+      {item.name}
+    </Select.Option>
+  ))}
+</Select>
+```
+
+## UI Templates
+
+### Шаблон "Документ" (Document Template)
+
+Применяется для страниц категории справочников и документов:
+
+#### 1. Структура страницы
+- **Заголовок страницы** отображается в верхней части
+- **Два блока фильтров** под шапкой:
+  - **Статичный блок** - основные фильтры (проект, корпус и т.д.)
+  - **Скрываемый блок** - дополнительные фильтры с кнопкой свернуть/развернуть
+- **Таблица данных** - основное содержимое страницы
+
+#### 2. Режимы работы таблицы
+- **Режим просмотра** (view) - отображение данных
+- **Режим добавления** (add) - добавление новых строк
+- **Режим редактирования** (edit) - inline редактирование существующих строк
+- **Режим удаления** (delete) - массовое удаление с чекбоксами
+- **Массовое редактирование** - одновременное редактирование нескольких строк
+
+#### 3. Закрепление элементов и прокрутка
+**КРИТИЧЕСКИ ВАЖНО** для предотвращения двойного скролла:
+
+```tsx
+// Главный контейнер страницы - фиксированная высота
+<div style={{ 
+  height: 'calc(100vh - 96px)',
+  display: 'flex', 
+  flexDirection: 'column',
+  overflow: 'hidden'  // ВАЖНО: предотвращает скролл страницы
+}}>
+  // Секция фильтров - не сжимается
+  <div style={{ flexShrink: 0, paddingBottom: 16 }}>
+    {/* Фильтры */}
+  </div>
+  
+  // Контейнер таблицы - занимает оставшееся пространство
+  <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
+    <Table
+      sticky  // Закрепление заголовков
+      scroll={{ 
+        x: 'max-content',
+        y: 'calc(100vh - 300px)'
+      }}
+    />
+  </div>
+</div>
+```
+
+#### 4. Цветовая схема строк
+- green: #d9f7be
+- yellow: #fff1b8
+- blue: #e6f7ff
+- red: #ffa39e
+
+## Code Standards
+- Component names: `PascalCase`
+- Variables and functions: `camelCase`
+- Use functional React components with hooks
+- Data fetching via TanStack Query
+- Auth state via Zustand store
+- Follow existing patterns in codebase
+
+## TypeScript Configuration
+- Composite project with separate `tsconfig.app.json` and `tsconfig.node.json`
+- Strict mode enabled with all strict checks
+- Path aliases configured in both `tsconfig.app.json` and `vite.config.ts`
+- Build info cached in `node_modules/.tmp/`
+- Module resolution: bundler mode with ESNext modules
