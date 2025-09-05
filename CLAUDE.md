@@ -105,16 +105,26 @@ psql "$DATABASE_URL" -f supabase/schema.sql
   - **EXCEPTION**: Mapping/junction tables (many-to-many relationships) should NOT have `created_at` and `updated_at` fields
 - **Primary keys**: All tables use UUID for primary keys (id field)
 - **Mapping table naming**: All mapping/junction tables MUST have `_mapping` suffix
-- **NEVER use RLS (Row Level Security)** - handle auth in application layer
+- **КРИТИЧЕСКИ ВАЖНО: НИКОГДА не используй RLS (Row Level Security)** - вся авторизация обрабатывается на уровне приложения
+- **ЗАПРЕЩЕНО создавать любые RLS политики** - это может нарушить работу приложения
 - Use optimistic locking via `updated_at` timestamp for concurrent edits
 
 ### API Pattern
-Standard Supabase query pattern:
+Standard Supabase query pattern with обязательным логированием:
 ```typescript
 const { data, error } = await supabase
   .from('table')
   .select('*, relation:table(*)')
   .order('created_at', { ascending: false });
+
+// ОБЯЗАТЕЛЬНОЕ логирование каждого запроса
+console.log('API Request:', {
+  table: 'table',
+  action: 'select',
+  timestamp: new Date().toISOString(),
+  success: !error,
+  dataCount: data?.length || 0
+});
 
 if (error) {
   console.error('Operation failed:', error);
@@ -143,6 +153,7 @@ if (error) {
 - Use functional React components and hooks
 - Data fetching via TanStack Query
 - All tables MUST have sorting and filters in column headers
+- **ОБЯЗАТЕЛЬНО логировать все действия пользователя в консоль** - каждый клик, отправка формы, API запрос должен быть залогирован
 
 ### NEVER DO
 - Create files unless absolutely necessary
@@ -151,8 +162,9 @@ if (error) {
 - Commit .env files or secrets
 - Use `any` type in TypeScript
 - Create documentation files proactively
-- Use RLS (Row Level Security)
+- **НИКОГДА не создавай RLS (Row Level Security) политики** - это строго запрещено
 - Store secrets or generated artifacts in repository
+- **Создавать файлы длиннее 600 строк** - разбивай на более мелкие файлы
 
 ## UI/UX Guidelines
 - **Mobile-first** design approach
@@ -249,6 +261,8 @@ All Select components in filters MUST include:
 - Data fetching via TanStack Query
 - Auth state via Zustand store
 - Follow existing patterns in codebase
+- **Максимальная длина файла: 600 строк** - если файл превышает этот лимит, разбивай его на более мелкие модули
+- **Логирование пользовательских действий**: все кнопки, формы, навигация должны логировать действия в console.log
 
 ## TypeScript Configuration
 - Composite project with separate `tsconfig.app.json` and `tsconfig.node.json`
