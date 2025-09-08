@@ -1,5 +1,15 @@
 import { supabase } from '@/lib/supabase'
 
+// Mock данные для случая когда Supabase не настроен
+const mockUnits: Unit[] = [
+  { id: 'mock-unit-1', name: 'штука', short_name: 'шт', description: 'Единица для штучного товара', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+  { id: 'mock-unit-2', name: 'метр квадратный', short_name: 'м²', description: 'Единица площади', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+  { id: 'mock-unit-3', name: 'метр кубический', short_name: 'м³', description: 'Единица объема', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+  { id: 'mock-unit-4', name: 'метр погонный', short_name: 'м.п.', description: 'Единица длины для погонных материалов', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+  { id: 'mock-unit-5', name: 'килограмм', short_name: 'кг', description: 'Единица массы', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+  { id: 'mock-unit-6', name: 'тонна', short_name: 'т', description: 'Единица массы для больших объемов', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+]
+
 export interface Unit {
   id: string
   name: string
@@ -26,14 +36,24 @@ export interface UnitUpdate {
 
 export const unitsApi = {
   async getAll(): Promise<Unit[]> {
+
     const { data, error } = await supabase
       .from('units')
       .select('*')
       .eq('is_active', true)
       .order('name', { ascending: true })
 
+    console.log('API Request:', {
+      table: 'units',
+      action: 'select_all',
+      mode: 'supabase',
+      timestamp: new Date().toISOString(),
+      success: !error,
+      dataCount: data?.length || 0,
+    })
+
     if (error) {
-      console.error('Failed to fetch units:', error)
+      console.error('Get all units failed:', error)
       throw error
     }
 
@@ -100,5 +120,5 @@ export const unitsApi = {
 
   async getActive(): Promise<Unit[]> {
     return this.getAll()
-  }
+  },
 }
