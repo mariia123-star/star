@@ -1,7 +1,7 @@
 export { tenderEstimatesApi } from './api/tender-estimates-api'
-export type { 
-  TenderEstimate, 
+export type {
+  TenderEstimate,
   TenderEstimateWithUnit,
-  TenderEstimateCreate, 
-  TenderEstimateUpdate 
+  TenderEstimateCreate,
+  TenderEstimateUpdate,
 } from './api/tender-estimates-api'

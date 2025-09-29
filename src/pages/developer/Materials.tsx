@@ -25,6 +25,7 @@ import {
   SearchOutlined,
   FileExcelOutlined,
   UploadOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -67,12 +68,12 @@ function Materials() {
 
   const queryClient = useQueryClient()
 
-  const { data: materials = [], isLoading } = useQuery({
+  const { data: materials = [], isLoading, error: materialsError } = useQuery({
     queryKey: ['materials'],
     queryFn: materialsApi.getAll,
   })
 
-  const { data: units = [] } = useQuery({
+  const { data: units = [], error: unitsError } = useQuery({
     queryKey: ['units'],
     queryFn: unitsApi.getAll,
   })
@@ -81,7 +82,19 @@ function Materials() {
     action: 'page_render',
     timestamp: new Date().toISOString(),
     materialsCount: materials.length,
+    unitsCount: units.length,
+    isLoading,
+    materialsError: materialsError?.message,
+    unitsError: unitsError?.message,
   })
+
+  // Детальное логирование данных
+  if (materials.length > 0) {
+    console.log('Materials data sample:', materials.slice(0, 2))
+  }
+  if (units.length > 0) {
+    console.log('Units data sample:', units.slice(0, 2))
+  }
 
   const createMutation = useMutation({
     mutationFn: materialsApi.create,
@@ -365,7 +378,7 @@ function Materials() {
 
             // Валидация категории
             const validCategories = MATERIAL_CATEGORY_OPTIONS.map(opt => opt.value)
-            if (!validCategories.includes(rowData.category)) {
+            if (!validCategories.includes(rowData.category as any)) {
               console.warn(`Строка ${i + 1}: неизвестная категория '${rowData.category}', использована 'other'`)
               rowData.category = 'other'
             }
@@ -601,37 +614,61 @@ function Materials() {
   ]
 
   return (
-    <div
-      style={{
-        height: 'calc(100vh - 96px)',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-      }}
-    >
-      <div style={{ flexShrink: 0, paddingBottom: 16 }}>
+    <div className="modern-page-container materials-page">
+      <div className="modern-page-header">
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: 16,
+            marginBottom: 24,
           }}
         >
-          <Title level={2} style={{ margin: 0 }}>
-            Сборник материалов
-          </Title>
-          <Space>
-            <Button icon={<FileExcelOutlined />} onClick={handleImportClick}>
+          <div className="modern-page-title">
+            <div className="modern-page-icon rates">
+              <AppstoreOutlined />
+            </div>
+            <div>
+              <Title level={2} style={{ margin: 0, color: '#1a1a1a', fontSize: 28, fontWeight: 700 }}>
+                Сборник материалов
+              </Title>
+              <div style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>
+                Каталог строительных материалов и их характеристики
+              </div>
+            </div>
+          </div>
+          <Space size={12}>
+            <Button
+              size="large"
+              icon={<FileExcelOutlined />}
+              onClick={handleImportClick}
+              style={{
+                borderRadius: 10,
+                height: 44,
+                borderColor: '#10b981',
+                color: '#10b981',
+                fontWeight: 600,
+              }}
+            >
               Импорт из Excel
             </Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+            <Button 
+              type="primary" 
+              size="large"
+              className="modern-add-button rates"
+              icon={<PlusOutlined />} 
+              onClick={handleAdd}
+            >
               Добавить материал
             </Button>
           </Space>
         </div>
 
-        <Card size="small">
+        <Card size="small" style={{
+          background: '#f8fafc',
+          border: '1px solid #e2e8f0',
+          borderRadius: 12
+        }}>
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={12} md={8} lg={6}>
               <Search
@@ -667,12 +704,24 @@ function Materials() {
         </Card>
       </div>
 
-      <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
+      <div className="modern-page-content">
+        {materialsError && (
+          <div style={{ padding: 16, textAlign: 'center', color: '#ff4d4f' }}>
+            Ошибка загрузки материалов: {materialsError.message}
+          </div>
+        )}
+        {unitsError && (
+          <div style={{ padding: 16, textAlign: 'center', color: '#ff4d4f' }}>
+            Ошибка загрузки единиц измерения: {unitsError.message}
+          </div>
+        )}
         <Table
+          className="modern-table"
           columns={columns}
           dataSource={filteredMaterials}
           loading={isLoading}
           rowKey="id"
+          size="middle"
           pagination={{
             showSizeChanger: true,
             showQuickJumper: true,
@@ -680,10 +729,11 @@ function Materials() {
               `${range[0]}-${range[1]} из ${total} записей`,
             pageSizeOptions: ['10', '20', '50', '100'],
             defaultPageSize: 20,
+            position: ['topRight', 'bottomRight'],
           }}
           scroll={{
             x: 'max-content',
-            y: 'calc(100vh - 300px)',
+            y: 'calc(100vh - 400px)',
           }}
           sticky
         />

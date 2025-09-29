@@ -1,19 +1,19 @@
 import { useState } from 'react'
-import { 
-  Table, 
-  Button, 
-  Space, 
-  Typography, 
-  Modal, 
-  Form, 
-  Input, 
-  Switch, 
+import {
+  Table,
+  Button,
+  Space,
+  Typography,
+  Modal,
+  Form,
+  Input,
+  Switch,
   message,
-  Popconfirm
+  Popconfirm,
 } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, ColumnHeightOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { unitsApi, Unit, UnitCreate, UnitUpdate } from '@/entities/units'
+import { unitsApi, Unit, UnitUpdate } from '@/entities/units'
 
 const { Title } = Typography
 
@@ -28,7 +28,7 @@ function UnitsReference() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null)
   const [form] = Form.useForm<UnitFormData>()
-  
+
   const queryClient = useQueryClient()
 
   const { data: units = [], isLoading } = useQuery({
@@ -43,7 +43,7 @@ function UnitsReference() {
       message.success('Единица измерения успешно создана')
       handleCloseModal()
     },
-    onError: (error) => {
+    onError: error => {
       console.error('Create error:', error)
       message.error('Ошибка при создании единицы измерения')
     },
@@ -57,7 +57,7 @@ function UnitsReference() {
       message.success('Единица измерения успешно обновлена')
       handleCloseModal()
     },
-    onError: (error) => {
+    onError: error => {
       console.error('Update error:', error)
       message.error('Ошибка при обновлении единицы измерения')
     },
@@ -69,7 +69,7 @@ function UnitsReference() {
       queryClient.invalidateQueries({ queryKey: ['units'] })
       message.success('Единица измерения успешно удалена')
     },
-    onError: (error) => {
+    onError: error => {
       console.error('Delete error:', error)
       message.error('Ошибка при удалении единицы измерения')
     },
@@ -101,7 +101,7 @@ function UnitsReference() {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
-      
+
       if (editingUnit) {
         updateMutation.mutate({
           id: editingUnit.id,
@@ -140,10 +140,12 @@ function UnitsReference() {
       key: 'is_active',
       width: 100,
       render: (isActive: boolean) => (
-        <span style={{ 
-          color: isActive ? '#52c41a' : '#ff4d4f',
-          fontWeight: 500 
-        }}>
+        <span
+          style={{
+            color: isActive ? '#52c41a' : '#ff4d4f',
+            fontWeight: 500,
+          }}
+        >
           {isActive ? 'Активен' : 'Неактивен'}
         </span>
       ),
@@ -182,15 +184,33 @@ function UnitsReference() {
   ]
 
   return (
-    <div style={{ height: 'calc(100vh - 112px)', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ flexShrink: 0, marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Title level={2} style={{ margin: 0 }}>
-            Единицы измерения
-          </Title>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
+    <div className="modern-page-container units-page">
+      <div className="modern-page-header">
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <div className="modern-page-title">
+            <div className="modern-page-icon units">
+              <ColumnHeightOutlined />
+            </div>
+            <div>
+              <Title level={2} style={{ margin: 0, color: '#1a1a1a', fontSize: 28, fontWeight: 700 }}>
+                Единицы измерения
+              </Title>
+              <div style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>
+                Справочник единиц измерения материалов
+              </div>
+            </div>
+          </div>
+          <Button 
+            type="primary" 
+            size="large"
+            className="modern-add-button units"
+            icon={<PlusOutlined />} 
             onClick={handleAdd}
           >
             Добавить единицу
@@ -198,12 +218,14 @@ function UnitsReference() {
         </div>
       </div>
 
-      <div style={{ flex: 1, overflow: 'hidden' }}>
+      <div className="modern-page-content">
         <Table
+          className="modern-table"
           columns={columns}
           dataSource={units}
           loading={isLoading}
           rowKey="id"
+          size="middle"
           pagination={{
             showSizeChanger: true,
             showQuickJumper: true,
@@ -211,28 +233,29 @@ function UnitsReference() {
               `${range[0]}-${range[1]} из ${total} записей`,
             pageSizeOptions: ['10', '20', '50', '100'],
             defaultPageSize: 20,
+            position: ['topRight', 'bottomRight'],
           }}
           scroll={{
             x: 'max-content',
-            y: 'calc(100vh - 300px)',
+            y: 'calc(100vh - 400px)',
           }}
           sticky
         />
       </div>
 
       <Modal
-        title={editingUnit ? 'Редактировать единицу измерения' : 'Добавить единицу измерения'}
+        title={
+          editingUnit
+            ? 'Редактировать единицу измерения'
+            : 'Добавить единицу измерения'
+        }
         open={isModalOpen}
         onOk={handleSubmit}
         onCancel={handleCloseModal}
         confirmLoading={createMutation.isPending || updateMutation.isPending}
         width={600}
       >
-        <Form
-          form={form}
-          layout="vertical"
-          initialValues={{ is_active: true }}
-        >
+        <Form form={form} layout="vertical" initialValues={{ is_active: true }}>
           <Form.Item
             name="name"
             label="Наименование"
@@ -258,9 +281,7 @@ function UnitsReference() {
           <Form.Item
             name="description"
             label="Описание"
-            rules={[
-              { max: 500, message: 'Максимальная длина 500 символов' },
-            ]}
+            rules={[{ max: 500, message: 'Максимальная длина 500 символов' }]}
           >
             <Input.TextArea
               rows={3}

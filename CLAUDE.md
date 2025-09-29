@@ -19,10 +19,11 @@ npm run build        # TypeScript check + Vite build (MUST pass before commit)
 npm run lint         # ESLint check (MUST pass before commit)
 npm run format       # Prettier formatting
 npm run format:check # Check formatting without changes
-npx tsc --noEmit     # Type checking only (standalone)
+npm run type-check   # Type checking only (standalone)
 ```
 
 ## Pre-commit Checklist
+
 1. Run `npm run lint` and fix all warnings
 2. Run `npm run format` to ensure consistent formatting
 3. Run `npm run build` and ensure project builds successfully
@@ -31,6 +32,7 @@ npx tsc --noEmit     # Type checking only (standalone)
 ## Architecture Overview
 
 ### Tech Stack
+
 - **Frontend**: React 19.1, TypeScript 5.8 (strict mode), Vite 7.0
 - **UI Library**: Ant Design 5.21 with Vibe design approach
 - **State Management**: TanStack Query 5.59+ (server state), Zustand 5.0+ (auth state)
@@ -42,6 +44,7 @@ npx tsc --noEmit     # Type checking only (standalone)
 - **Development**: ESLint, Prettier, dotenv for environment management
 
 ### Feature-Sliced Design (FSD) Structure
+
 ```
 src/
 ├── app/          # App-level providers, routing
@@ -56,6 +59,7 @@ src/
 ```
 
 ### Key Patterns
+
 - **Public API**: Each slice exposes through `index.ts`
 - **Imports**: Use path aliases configured in `vite.config.ts` and `tsconfig.app.json`:
   - `@/` → `./src`
@@ -69,31 +73,75 @@ src/
 - **API Files**: Named as `entity-name-api.ts` in `entities/*/api/`
 - **Error Handling**: All Supabase queries must include error handling
 
-## Database Integration
+## Database Integrationclaude
 
-**CRITICAL**: Always reference `supabase/schema.sql` for current database structure.
+**КРИТИЧЕСКИ ВАЖНО**: Вся информация о структуре базы данных, функциях, триггерах и представлениях должна браться СТРОГО из файла `supabase/prod.sql`. Этот файл является единственным источником истины для схемы БД и содержит актуальное состояние продакшн базы данных.
+
+### MCP Servecclauder Integration
+
+MCP (Model Context Protocol) сервер для Supabase настроен в `.claude/mcp_servers_config.json` и позволяет выполнять SQL запросы напрямую к базе данных для анализа и отладки.
 
 ### Supabase Configuration
-Environment variables required:
+
+Environment variables required (see `.env.example`):
+
 ```env
+# Supabase Configuration
 VITE_SUPABASE_URL=your-supabase-url
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 VITE_STORAGE_BUCKET=your-storage-bucket-url
+
+# MCP Server Configuration (для Claude Code)
+SUPABASE_URL=your-supabase-url
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# Development Settings
+NODE_ENV=development
+VITE_DEV_HOST=192.168.8.85
+VITE_DEV_PORT=5173
+
+# Database
+DATABASE_URL=postgresql://postgres:password@localhost:5432/star_db
+
+# Performance Settings
+VITE_MAX_FILE_SIZE=262144000
+VITE_IMPORT_BATCH_SIZE=5000
+VITE_RENDER_BATCH_SIZE=10000
+
+# Observability
+VITE_SENTRY_DSN=your-sentry-dsn
+VITE_GRAFANA_CLOUD_URL=your-grafana-url
+
+# Feature Flags
+VITE_ENABLE_REALTIME=true
+VITE_ENABLE_OFFLINE=false
 ```
 
 Configuration: `src/lib/supabase.ts`
 
 ### Database Deployment
-Deploy database schema:
+
+Deploy database schemas:
+
 ```bash
+# Main production schema (актуальное состояние БД)
+psql "$DATABASE_URL" -f supabase/prod.sql
+
+# Main development schema
 psql "$DATABASE_URL" -f supabase/schema.sql
+
+# Legacy/additional schemas (если нужны для разработки)
+psql "$DATABASE_URL" -f supabase/portal_schema.sql
+psql "$DATABASE_URL" -f supabase/file_storage_schema.sql
 ```
 
 ### Core Tables
+
+- `tender_estimates` - Тендерные сметы с материалами, работами, количеством и ценами
+- `units` - Справочник единиц измерения
 - `chessboard` - Main data table for material tracking
 - `chessboard_mapping` - Mapping relationships
 - `entity_comments_mapping` - Universal mapping table for comments to entities
-- `units` - Units of measurement
 - `cost_categories`, `detail_cost_categories` - Cost categorization
 - `location` - Location/localization data
 - `projects`, `blocks` - Project structure
@@ -101,6 +149,7 @@ psql "$DATABASE_URL" -f supabase/schema.sql
 - `rates` - Rate management with cost categories
 
 ### Database Rules
+
 - All tables MUST include `created_at` and `updated_at` fields
   - **EXCEPTION**: Mapping/junction tables (many-to-many relationships) should NOT have `created_at` and `updated_at` fields
 - **Primary keys**: All tables use UUID for primary keys (id field)
@@ -110,12 +159,14 @@ psql "$DATABASE_URL" -f supabase/schema.sql
 - Use optimistic locking via `updated_at` timestamp for concurrent edits
 
 ### API Pattern
+
 Standard Supabase query pattern with обязательным логированием:
+
 ```typescript
 const { data, error } = await supabase
   .from('table')
   .select('*, relation:table(*)')
-  .order('created_at', { ascending: false });
+  .order('created_at', { ascending: false })
 
 // ОБЯЗАТЕЛЬНОЕ логирование каждого запроса
 console.log('API Request:', {
@@ -123,16 +174,17 @@ console.log('API Request:', {
   action: 'select',
   timestamp: new Date().toISOString(),
   success: !error,
-  dataCount: data?.length || 0
-});
+  dataCount: data?.length || 0,
+})
 
 if (error) {
-  console.error('Operation failed:', error);
-  throw error;
+  console.error('Operation failed:', error)
+  throw error
 }
 ```
 
 ## Performance Requirements
+
 - Import 5,000 Excel rows ≤ 30 seconds
 - Render 10,000 rows ≤ 100ms
 - Support 100 concurrent users
@@ -143,6 +195,7 @@ if (error) {
 ## Critical Guidelines
 
 ### MUST DO
+
 - Run `npm run lint` before committing
 - Run `npm run format` for consistent code style
 - Handle all TypeScript strict mode requirements
@@ -156,6 +209,7 @@ if (error) {
 - **ОБЯЗАТЕЛЬНО логировать все действия пользователя в консоль** - каждый клик, отправка формы, API запрос должен быть залогирован
 
 ### NEVER DO
+
 - Create files unless absolutely necessary
 - Add comments unless explicitly requested
 - Use relative imports (../../../)
@@ -167,6 +221,7 @@ if (error) {
 - **Создавать файлы длиннее 600 строк** - разбивай на более мелкие файлы
 
 ## UI/UX Guidelines
+
 - **Mobile-first** design approach
 - **WCAG 2.1 AA** accessibility compliance
 - Modern, responsive UI with Ant Design 5/Vibe design system
@@ -176,7 +231,9 @@ if (error) {
 - **Multi-language**: UI is in Russian, maintain Russian labels for user-facing elements
 
 ### Filter Components Requirements
+
 All Select components in filters MUST include:
+
 - `allowClear` - enables X button to clear selection
 - `showSearch` - enables search by typing
 - `filterOption` - custom filter function for Russian text support
@@ -206,6 +263,7 @@ All Select components in filters MUST include:
 Применяется для страниц категории справочников и документов:
 
 #### 1. Структура страницы
+
 - **Заголовок страницы** отображается в верхней части
 - **Два блока фильтров** под шапкой:
   - **Статичный блок** - основные фильтры (проект, корпус и т.д.)
@@ -213,6 +271,7 @@ All Select components in filters MUST include:
 - **Таблица данных** - основное содержимое страницы
 
 #### 2. Режимы работы таблицы
+
 - **Режим просмотра** (view) - отображение данных
 - **Режим добавления** (add) - добавление новых строк
 - **Режим редактирования** (edit) - inline редактирование существующих строк
@@ -220,28 +279,28 @@ All Select components in filters MUST include:
 - **Массовое редактирование** - одновременное редактирование нескольких строк
 
 #### 3. Закрепление элементов и прокрутка
+
 **КРИТИЧЕСКИ ВАЖНО** для предотвращения двойного скролла:
 
 ```tsx
 // Главный контейнер страницы - фиксированная высота
-<div style={{ 
-  height: 'calc(100vh - 96px)',
-  display: 'flex', 
-  flexDirection: 'column',
-  overflow: 'hidden'  // ВАЖНО: предотвращает скролл страницы
-}}>
+<div
+  style={{
+    height: 'calc(100vh - 96px)',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden', // ВАЖНО: предотвращает скролл страницы
+  }}
+>
   // Секция фильтров - не сжимается
-  <div style={{ flexShrink: 0, paddingBottom: 16 }}>
-    {/* Фильтры */}
-  </div>
-  
+  <div style={{ flexShrink: 0, paddingBottom: 16 }}>{/* Фильтры */}</div>
   // Контейнер таблицы - занимает оставшееся пространство
   <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
     <Table
-      sticky  // Закрепление заголовков
-      scroll={{ 
+      sticky // Закрепление заголовков
+      scroll={{
         x: 'max-content',
-        y: 'calc(100vh - 300px)'
+        y: 'calc(100vh - 300px)',
       }}
     />
   </div>
@@ -249,12 +308,16 @@ All Select components in filters MUST include:
 ```
 
 #### 4. Цветовая схема строк
+
+- white: #ffffff (Заказчик)
+- orange: #F8CBAD (раб - рабочие)
+- blue: #A4C2F4 (мат - материалы)
 - green: #d9f7be
 - yellow: #fff1b8
-- blue: #e6f7ff
 - red: #ffa39e
 
 ## Code Standards
+
 - Component names: `PascalCase`
 - Variables and functions: `camelCase`
 - Use functional React components with hooks
@@ -265,6 +328,7 @@ All Select components in filters MUST include:
 - **Логирование пользовательских действий**: все кнопки, формы, навигация должны логировать действия в console.log
 
 ## TypeScript Configuration
+
 - Composite project with separate `tsconfig.app.json` and `tsconfig.node.json`
 - Strict mode enabled with all strict checks
 - Path aliases configured in both `tsconfig.app.json` and `vite.config.ts`

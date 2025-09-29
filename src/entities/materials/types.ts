@@ -48,7 +48,9 @@ export interface MaterialImportRow {
   description?: string
   category: string
   unit_name: string
+  unit_id?: string
   last_purchase_price?: number
   supplier?: string
   supplier_article?: string
+  is_active?: boolean
 }

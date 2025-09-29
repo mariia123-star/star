@@ -36,6 +36,17 @@ export interface UnitUpdate {
 
 export const unitsApi = {
   async getAll(): Promise<Unit[]> {
+    if (!supabase) {
+      console.log('API Request:', {
+        table: 'units',
+        action: 'select_all',
+        mode: 'mock',
+        timestamp: new Date().toISOString(),
+        success: true,
+        dataCount: mockUnits.length,
+      })
+      return mockUnits
+    }
 
     const { data, error } = await supabase
       .from('units')
@@ -61,11 +72,32 @@ export const unitsApi = {
   },
 
   async getById(id: string): Promise<Unit | null> {
+    if (!supabase) {
+      const unit = mockUnits.find(u => u.id === id)
+      console.log('API Request:', {
+        table: 'units',
+        action: 'select_by_id',
+        id,
+        mode: 'mock',
+        timestamp: new Date().toISOString(),
+        success: !!unit,
+      })
+      return unit || null
+    }
+
     const { data, error } = await supabase
       .from('units')
       .select('*')
       .eq('id', id)
       .single()
+
+    console.log('API Request:', {
+      table: 'units',
+      action: 'select_by_id',
+      id,
+      timestamp: new Date().toISOString(),
+      success: !error,
+    })
 
     if (error) {
       console.error('Failed to fetch unit:', error)
@@ -76,11 +108,40 @@ export const unitsApi = {
   },
 
   async create(unit: UnitCreate): Promise<Unit> {
+    if (!supabase) {
+      const newUnit: Unit = {
+        id: `mock-unit-${Date.now()}`,
+        ...unit,
+        is_active: unit.is_active ?? true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+      
+      console.log('API Request:', {
+        table: 'units',
+        action: 'create',
+        data: unit,
+        mode: 'mock',
+        timestamp: new Date().toISOString(),
+        success: true,
+      })
+      
+      return newUnit
+    }
+
     const { data, error } = await supabase
       .from('units')
       .insert(unit)
       .select()
       .single()
+
+    console.log('API Request:', {
+      table: 'units',
+      action: 'create',
+      data: unit,
+      timestamp: new Date().toISOString(),
+      success: !error,
+    })
 
     if (error) {
       console.error('Failed to create unit:', error)
@@ -91,12 +152,46 @@ export const unitsApi = {
   },
 
   async update(id: string, unit: UnitUpdate): Promise<Unit> {
+    if (!supabase) {
+      const existing = mockUnits.find(u => u.id === id)
+      if (!existing) {
+        throw new Error(`Единица с id ${id} не найдена`)
+      }
+      
+      const updated: Unit = {
+        ...existing,
+        ...unit,
+        updated_at: new Date().toISOString(),
+      }
+      
+      console.log('API Request:', {
+        table: 'units',
+        action: 'update',
+        id,
+        data: unit,
+        mode: 'mock',
+        timestamp: new Date().toISOString(),
+        success: true,
+      })
+      
+      return updated
+    }
+
     const { data, error } = await supabase
       .from('units')
       .update(unit)
       .eq('id', id)
       .select()
       .single()
+
+    console.log('API Request:', {
+      table: 'units',
+      action: 'update',
+      id,
+      data: unit,
+      timestamp: new Date().toISOString(),
+      success: !error,
+    })
 
     if (error) {
       console.error('Failed to update unit:', error)
@@ -107,10 +202,30 @@ export const unitsApi = {
   },
 
   async delete(id: string): Promise<void> {
+    if (!supabase) {
+      console.log('API Request:', {
+        table: 'units',
+        action: 'delete',
+        id,
+        mode: 'mock',
+        timestamp: new Date().toISOString(),
+        success: true,
+      })
+      return
+    }
+
     const { error } = await supabase
       .from('units')
       .update({ is_active: false })
       .eq('id', id)
+
+    console.log('API Request:', {
+      table: 'units',
+      action: 'delete',
+      id,
+      timestamp: new Date().toISOString(),
+      success: !error,
+    })
 
     if (error) {
       console.error('Failed to delete unit:', error)

@@ -23,6 +23,7 @@ npx tsc --noEmit    # Type checking only (standalone)
 ```
 
 ## Pre-commit Checklist
+
 1. Run `npm run lint` and fix all warnings
 2. Run `npm run format` to ensure consistent formatting
 3. Run `npm run build` and ensure project builds successfully
@@ -31,6 +32,7 @@ npx tsc --noEmit    # Type checking only (standalone)
 ## Architecture Overview
 
 ### Tech Stack
+
 - **Frontend**: React 19.1, TypeScript 5.8 (strict mode), Vite 7.0
 - **UI Library**: Ant Design 5.21 with Vibe design approach
 - **State Management**: TanStack Query 5.59+ (server state), Zustand 5.0+ (auth state)
@@ -44,6 +46,7 @@ npx tsc --noEmit    # Type checking only (standalone)
 - **Editor**: WebStorm
 
 ### Feature-Sliced Design (FSD) Structure
+
 ```
 src/
 ├── app/          # App-level providers, routing
@@ -60,6 +63,7 @@ src/
 **Note**: The project is in transition to FSD architecture. Current entities include: chessboard, disk, documentation, documentation-tags, materials, and rates.
 
 ### Key Patterns
+
 - **Public API**: Each slice exposes through `index.ts`
 - **Imports**: Use path aliases configured in `vite.config.ts` and `tsconfig.app.json`:
   - `@/` → `./src`
@@ -74,6 +78,7 @@ src/
 - **Error Handling**: All Supabase queries must include error handling
 
 ### Key Directories
+
 - `src/entities/` - Domain entities (chessboard, disk, documentation, documentation-tags, materials, rates)
 - `src/pages/` - Main application pages organized by sections (admin/, documents/, references/)
 - `src/features/auth/` - Authentication logic using Supabase
@@ -84,6 +89,7 @@ src/
 ## Core Features
 
 ### Chessboard Component (`src/pages/documents/Chessboard.tsx`)
+
 - Complex material tracking with Excel import
 - Hierarchical filtering: Project → Block → Cost Category → Cost Type
 - Real-time inline editing with optimistic locking
@@ -92,12 +98,14 @@ src/
 - Column settings persistence in localStorage
 
 ### Excel Import Requirements
+
 - Headers use fuzzy matching for: "материал", "кол", "ед" columns
 - Support drag-and-drop upload up to 250 MB
 - Store original files in Supabase Storage
 - Import 5,000 rows ≤ 30 seconds (performance target)
 
 ### Real-time Collaboration
+
 - Supabase Realtime WebSocket channels
 - Optimistic locking for concurrent editing
 - Conflict resolver: Merge/Overwrite/Rollback options
@@ -108,7 +116,9 @@ src/
 **CRITICAL**: Always reference `supabase/schemas/prod.sql` for current database structure.
 
 ### Supabase Configuration
+
 Environment variables required:
+
 ```env
 VITE_SUPABASE_URL=https://hfqgcaxmufzitdfafdlp.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcWdjYXhtdWZ6aXRkZmFmZGxwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ4OTI5MjMsImV4cCI6MjA3MDQ2ODkyM30.XnOEKdwZdJM-DilhrjZ7PdzHU2rx3L72oQ1rJYo5pXc
@@ -118,13 +128,16 @@ VITE_STORAGE_BUCKET=<storage_url>
 Configuration: `src/lib/supabase.ts`
 
 ### Database Deployment
+
 Deploy database schema:
+
 ```bash
 psql "$DATABASE_URL" -f supabase.sql
 for file in sql/*.sql; do psql "$DATABASE_URL" -f "$file"; done
 ```
 
 ### Core Tables
+
 - `chessboard` - Main data table for material tracking
 - `chessboard_mapping` - Mapping relationships
 - `entity_comments_mapping` - Universal mapping table for comments to entities
@@ -137,6 +150,7 @@ for file in sql/*.sql; do psql "$DATABASE_URL" -f "$file"; done
 - **Migration files**: `supabase.sql` and `sql/` directory (includes rates table creation)
 
 ### Database Rules
+
 - All tables MUST include `created_at` and `updated_at` fields
   - **EXCEPTION**: Mapping/junction tables (many-to-many relationships) should NOT have `created_at` and `updated_at` fields
 - **Primary keys**: All tables should use UUID for primary keys (id field)
@@ -146,22 +160,25 @@ for file in sql/*.sql; do psql "$DATABASE_URL" -f "$file"; done
 - Use optimistic locking via `updated_at` timestamp for concurrent edits
 
 ### API Pattern
+
 Standard Supabase query pattern:
+
 ```typescript
 const { data, error } = await supabase
   .from('table')
   .select('*, relation:table(*)')
-  .order('created_at', { ascending: false });
+  .order('created_at', { ascending: false })
 
 if (error) {
-  console.error('Operation failed:', error);
-  throw error;
+  console.error('Operation failed:', error)
+  throw error
 }
 ```
 
 ## Performance Requirements
 
 From technical specification (`tech_task.md`):
+
 - Import 5,000 Excel rows ≤ 30 seconds
 - Render 10,000 rows ≤ 100ms
 - Support 100 concurrent users
@@ -172,6 +189,7 @@ From technical specification (`tech_task.md`):
 ## Critical Guidelines
 
 ### MUST DO
+
 - Run `npm run lint` before committing
 - Run `npm run format` for consistent code style
 - Handle all TypeScript strict mode requirements
@@ -184,6 +202,7 @@ From technical specification (`tech_task.md`):
 - All tables MUST have sorting and filters in column headers
 
 ### NEVER DO
+
 - Create files unless absolutely necessary
 - Add comments unless explicitly requested
 - Use relative imports (../../../)
@@ -194,6 +213,7 @@ From technical specification (`tech_task.md`):
 - Store secrets or generated artifacts in repository
 
 ## UI/UX Guidelines
+
 - **Mobile-first** design approach
 - **WCAG 2.1 AA** accessibility compliance
 - Modern, responsive UI with Ant Design 5/Vibe design system
@@ -203,6 +223,7 @@ From technical specification (`tech_task.md`):
 - **Multi-language**: UI is in Russian, maintain Russian labels for user-facing elements
 
 ### Filter Components Requirements
+
 - **All Select components in filters MUST include:**
   - `allowClear` - enables X button to clear selection
   - `showSearch` - enables search by typing
@@ -231,6 +252,7 @@ From technical specification (`tech_task.md`):
 **Note:** For Select with `options` prop, use `option?.label`. For `Select.Option` children, use `option?.children`.
 
 ## Code Standards
+
 - Component names: `PascalCase`
 - Variables and functions: `camelCase`
 - Use functional React components with hooks
@@ -239,6 +261,7 @@ From technical specification (`tech_task.md`):
 - Follow existing patterns in codebase
 
 ## TypeScript Configuration
+
 - Composite project with separate `tsconfig.app.json` and `tsconfig.node.json`
 - Strict mode enabled with all strict checks
 - Path aliases configured in both `tsconfig.app.json` and `vite.config.ts`
@@ -252,6 +275,7 @@ From technical specification (`tech_task.md`):
 Применяется для страниц категории справочников и документов. При указании использовать "шаблон Документ", применяются следующие требования:
 
 #### 1. Структура страницы
+
 - **Заголовок страницы** отображается в верхней части
 - **Два блока фильтров** под шапкой:
   - **Статичный блок** - основные фильтры (проект, корпус и т.д.), всегда видимый
@@ -259,6 +283,7 @@ From technical specification (`tech_task.md`):
 - **Таблица данных** - основное содержимое страницы
 
 #### 2. Режимы работы таблицы
+
 - **Режим просмотра** (view) - отображение данных
 - **Режим добавления** (add) - добавление новых строк
 - **Режим редактирования** (edit) - inline редактирование существующих строк
@@ -266,6 +291,7 @@ From technical specification (`tech_task.md`):
 - **Массовое редактирование** - одновременное редактирование нескольких строк
 
 #### 3. Функциональность строк
+
 - **Добавление строки** - кнопка "+" или "Добавить строку"
 - **Копирование строки** - иконка копирования в столбце действий (только иконка, без текста)
 - **Редактирование** - inline редактирование по клику на кнопку редактирования (только иконка, без текста)
@@ -273,6 +299,7 @@ From technical specification (`tech_task.md`):
 - **Цветовая маркировка** - выбор цвета строки через color picker в левой части
 
 #### 4. Сохранение изменений
+
 - **Кнопка "Сохранить"** - сохранение всех изменений разом (появляется вместо кнопок Добавить/Удалить)
 - **Кнопка "Отмена"** - отмена всех несохраненных изменений
 - **Режимная логика кнопок**:
@@ -285,6 +312,7 @@ From technical specification (`tech_task.md`):
 - **Обработка конфликтов** - диалог при конфликте уникальных полей
 
 #### 5. Настройка столбцов
+
 - **Кнопка "Настройка столбцов"** в правой части скрываемого блока фильтров
 - **Стиль кнопки**: Обычная кнопка с иконкой (без `type="primary"` и `title`)
 - **Расположение**: В правой части блока с помощью `justify-content: space-between`
@@ -301,22 +329,26 @@ From technical specification (`tech_task.md`):
   - Автоматическое восстановление при следующем посещении страницы
 
 #### 6. Пагинация
+
 - **По умолчанию**: 100 строк на странице
 - **Варианты выбора**: 10, 20, 50, 100, 200, 500 строк
 - **Сохранение выбора** в localStorage
 
 #### 7. Закрепление элементов
+
 - **Sticky заголовок таблицы** - не уезжает при вертикальном скролле
 - **Блок фильтров** остается видимым при прокрутке
 - **Меню и шапка сайта** закреплены
 - **Горизонтальный и вертикальный скролл** таблицы с высотой calc(100vh - 300px)
 
 #### 8. Импорт/Экспорт
+
 - **Импорт из Excel** через drag-and-drop или выбор файла
 - **Обработка конфликтов** при импорте
 - **Экспорт в Excel** текущих отфильтрованных данных
 
 #### 9. Цветовая схема строк:
+
 - green: #d9f7be
 - yellow: #fff1b8
 - blue: #e6f7ff
@@ -341,24 +373,27 @@ From technical specification (`tech_task.md`):
 
 ```tsx
 // Главный контейнер страницы - фиксированная высота
-<div style={{ 
-  height: 'calc(100vh - 96px)', // 96px = высота header + отступы
-  display: 'flex', 
-  flexDirection: 'column',
-  overflow: 'hidden'  // ВАЖНО: предотвращает скролл страницы
-}}>
+<div
+  style={{
+    height: 'calc(100vh - 96px)', // 96px = высота header + отступы
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden', // ВАЖНО: предотвращает скролл страницы
+  }}
+>
   // Секция фильтров - не сжимается
   <div style={{ flexShrink: 0, paddingBottom: 16 }}>
     {/* Фильтры и управляющие элементы */}
   </div>
-  
   // Контейнер таблицы - занимает оставшееся пространство
-  <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>  // ВАЖНО: overflow: hidden, НЕ auto!
+  <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
+    {' '}
+    // ВАЖНО: overflow: hidden, НЕ auto!
     <Table
-      sticky  // Закрепление заголовков
-      scroll={{ 
+      sticky // Закрепление заголовков
+      scroll={{
         x: 'max-content',
-        y: 'calc(100vh - 300px)'  // Фиксированная высота для скролла таблицы
+        y: 'calc(100vh - 300px)', // Фиксированная высота для скролла таблицы
         // Если есть пагинация: y: 'calc(100vh - 350px)'
       }}
       // ... остальные props
@@ -369,7 +404,7 @@ From technical specification (`tech_task.md`):
 
 #### Ключевые правила для предотвращения двойного скролла:
 
-1. **Главный контейнер**: 
+1. **Главный контейнер**:
    - `height: calc(100vh - 96px)` - фиксированная высота
    - `overflow: hidden` - блокирует скролл страницы
 
@@ -386,19 +421,24 @@ From technical specification (`tech_task.md`):
 ## Application Structure Notes
 
 ### Multi-Select Filter Support
+
 In the Chessboard component, all filters except "Проект" (Project) support multiple selection. The project filter remains single-select as it's the primary filter that determines data scope. All other filters (Корпус, Категория затрат, Вид затрат, Раздел, Шифр документа) should allow users to select multiple values for more flexible data filtering.
 
 ### Entity Pattern
+
 All entities follow the same structure:
+
 - `api/entity-name-api.ts` - API functions for server communication
 - `model/types.ts` - TypeScript types and interfaces
 - `index.ts` - Public API exports
 
 ### Context Providers
+
 - `LogoContext` - Manages light and dark theme logos with localStorage persistence
 - `ScaleContext` - Handles UI scaling for responsive design
 
 ## Important Notes
+
 - Excel import headers are flexible - use fuzzy matching
 - Cascading logic: When cost category changes, reset cost type and location
 - Row operations: Support add, copy, edit, delete with proper state management
