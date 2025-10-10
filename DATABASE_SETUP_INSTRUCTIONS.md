@@ -11,6 +11,7 @@
 ### Шаг 2: Проверить создание таблицы
 
 Выполните в SQL Editor:
+
 ```sql
 SELECT * FROM public.rate_materials_mapping LIMIT 1;
 ```
@@ -26,9 +27,10 @@ SELECT * FROM public.rate_materials_mapping LIMIT 1;
 **Назначение**: Связывает расценки с материалами и их расходом
 
 **Поля**:
+
 - `id` - UUID первичный ключ
 - `rate_id` - ID расценки (foreign key)
-- `material_id` - ID материала (foreign key) 
+- `material_id` - ID материала (foreign key)
 - `consumption` - Расход материала (число с 3 знаками после запятой)
 - `unit_price` - Цена за единицу на момент добавления
 - `notes` - Дополнительные примечания
@@ -36,5 +38,6 @@ SELECT * FROM public.rate_materials_mapping LIMIT 1;
 - `updated_at` - Дата последнего изменения
 
 **Ограничения**:
+
 - Уникальная пара (rate_id, material_id)
 - Каскадное удаление при удалении расценки или материала

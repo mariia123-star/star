@@ -5,15 +5,17 @@
 Эта миграция расширяет таблицу `tender_estimates` для поддержки полной функциональности тендерных смет с разделением на работы и материалы.
 
 ### Добавляемые колонки:
+
 - `material_type` - Тип материала (Основной/Вспомогательный)
 - `coefficient` - Коэффициент расхода материала
-- `work_price` - Цена работы за единицу измерения  
+- `work_price` - Цена работы за единицу измерения
 - `material_price` - Цена материала с НДС без доставки
 - `delivery_cost` - Стоимость доставки материала
 - `record_type` - Тип записи (work/material/summary)
 - `project_id` - Ссылка на проект
 
 ### Дополнительные изменения:
+
 - Создание индексов для производительности
 - Добавление ограничений на `record_type`
 - Функция автоматического расчета `total_price`
@@ -62,6 +64,7 @@ curl -X POST 'https://[your-ref].supabase.co/rest/v1/rpc/exec_sql' \
 ### Ожидаемые результаты проверки:
 
 #### Новые колонки:
+
 ```
 material_type    | character varying(50) | YES
 coefficient      | numeric(10,4)         | YES | 1
@@ -73,13 +76,15 @@ project_id       | uuid                  | YES
 ```
 
 #### Новые индексы:
+
 ```
 idx_tender_estimates_record_type
-idx_tender_estimates_project_id  
+idx_tender_estimates_project_id
 idx_tender_estimates_is_active
 ```
 
 #### Ограничения:
+
 ```
 check_record_type | CHECK | (record_type IN ('work', 'material', 'summary'))
 ```
@@ -102,7 +107,7 @@ DROP INDEX IF EXISTS idx_tender_estimates_project_id;
 DROP INDEX IF EXISTS idx_tender_estimates_is_active;
 
 -- Удаление колонок (ОСТОРОЖНО! Данные будут потеряны)
-ALTER TABLE public.tender_estimates 
+ALTER TABLE public.tender_estimates
 DROP COLUMN IF EXISTS material_type,
 DROP COLUMN IF EXISTS coefficient,
 DROP COLUMN IF EXISTS work_price,
@@ -115,6 +120,7 @@ DROP COLUMN IF EXISTS project_id;
 ## Тестирование после миграции
 
 1. Создайте тестовую запись:
+
 ```sql
 INSERT INTO public.tender_estimates (
     works, materials, unit, quantity, unit_price,
@@ -131,13 +137,17 @@ INSERT INTO public.tender_estimates (
 ## Возможные проблемы и решения
 
 ### Ошибка: "column already exists"
+
 Это нормально - используется `ADD COLUMN IF NOT EXISTS`
 
 ### Ошибка с ограничениями
+
 Проверьте, что в существующих данных нет недопустимых значений для `record_type`
 
 ### Проблемы с производительностью
+
 После миграции выполните:
+
 ```sql
 ANALYZE public.tender_estimates;
 ```
@@ -145,6 +155,7 @@ ANALYZE public.tender_estimates;
 ## Контакты для поддержки
 
 При возникновении проблем:
+
 1. Проверьте логи Supabase Dashboard
 2. Выполните запросы проверки из `verify_migration.sql`
 3. Сохраните текст ошибок для анализа

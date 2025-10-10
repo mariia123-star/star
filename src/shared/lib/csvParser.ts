@@ -2,31 +2,31 @@ import { EstimateItem, CSVParseResult } from '@/shared/types/estimate'
 
 export class CSVParser {
   private static readonly COLUMNS = [
-    'number',          // № п/п
-    'contractor',      // Заказчик
-    'materialType',    // Тип материала
+    'number', // № п/п
+    'contractor', // Заказчик
+    'materialType', // Тип материала
     'workDescription', // Наименование работ
-    'unit',           // Ед. изм.
-    'volume',         // Объем
-    'materialCoeff',  // Коэф. расхода мат-лов
-    'workPrice',      // Цена работы, руб за ед.
+    'unit', // Ед. изм.
+    'volume', // Объем
+    'materialCoeff', // Коэф. расхода мат-лов
+    'workPrice', // Цена работы, руб за ед.
     'materialPriceWithVAT', // Цена мат-лов с НДС без учета доставки
-    'deliveryPrice',  // Доставка материалов
-    'total'           // Итого
+    'deliveryPrice', // Доставка материалов
+    'total', // Итого
   ]
 
-  static async parseFile(file: File): Promise<CSVParseResult> {
+  static async parseFile(file: globalThis.File): Promise<CSVParseResult> {
     console.log('CSV Parser: Начинаем парсинг файла', {
       fileName: file.name,
       fileSize: file.size,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     })
 
     const result: CSVParseResult = {
       data: [],
       errors: [],
       totalRows: 0,
-      skippedRows: 0
+      skippedRows: 0,
     }
 
     try {
@@ -36,7 +36,7 @@ export class CSVParser {
 
       console.log('CSV Parser: Файл прочитан', {
         totalLines: lines.length,
-        encoding: 'windows-1251'
+        encoding: 'windows-1251',
       })
 
       // Пропускаем заголовок, если есть
@@ -51,7 +51,9 @@ export class CSVParser {
             result.skippedRows++
           }
         } catch (error) {
-          result.errors.push(`Строка ${i + 2}: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`)
+          result.errors.push(
+            `Строка ${i + 2}: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`
+          )
           result.skippedRows++
         }
       }
@@ -63,11 +65,11 @@ export class CSVParser {
         parsedItems: result.data.length,
         errors: result.errors.length,
         skippedRows: result.skippedRows,
-        success: result.errors.length === 0
+        success: result.errors.length === 0,
       })
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка'
+      const errorMessage =
+        error instanceof Error ? error.message : 'Неизвестная ошибка'
       result.errors.push(`Ошибка чтения файла: ${errorMessage}`)
       console.error('CSV Parser: Критическая ошибка', error)
     }
@@ -75,18 +77,18 @@ export class CSVParser {
     return result
   }
 
-  private static async readFileAsText(file: File): Promise<string> {
+  private static async readFileAsText(file: globalThis.File): Promise<string> {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader()
+      const reader = new window.FileReader()
 
-      reader.onload = (event) => {
+      reader.onload = event => {
         try {
           const arrayBuffer = event.target?.result as ArrayBuffer
           // Декодируем из Windows-1251
-          const decoder = new TextDecoder('windows-1251')
+          const decoder = new window.TextDecoder('windows-1251')
           const text = decoder.decode(arrayBuffer)
           resolve(text)
-        } catch (error) {
+        } catch (_error) {
           reject(new Error('Ошибка декодирования файла'))
         }
       }
@@ -96,12 +98,19 @@ export class CSVParser {
     })
   }
 
-  private static parseLine(line: string, lineNumber: number): EstimateItem | null {
+  private static parseLine(
+    line: string,
+    lineNumber: number
+  ): EstimateItem | null {
     // Разделяем по точке с запятой или табуляции
-    const cells = line.split(/[;\t]/).map(cell => cell.trim().replace(/^"|"$/g, ''))
+    const cells = line
+      .split(/[;\t]/)
+      .map(cell => cell.trim().replace(/^"|"$/g, ''))
 
     if (cells.length < 11) {
-      throw new Error(`Недостаточно колонок: ожидается 11, получено ${cells.length}`)
+      throw new Error(
+        `Недостаточно колонок: ожидается 11, получено ${cells.length}`
+      )
     }
 
     // Проверяем, не пустая ли строка
@@ -132,7 +141,7 @@ export class CSVParser {
       deliveryPrice: this.parseNumber(cells[9]),
       total: this.parseNumber(cells[10]) || 0,
       isExpanded: true,
-      isModified: false
+      isModified: false,
     }
 
     return item
@@ -190,31 +199,33 @@ export class CSVParser {
       'Цена работы, руб за ед.',
       'Цена мат-лов с НДС без учета доставки',
       'Доставка материалов',
-      'Итого'
+      'Итого',
     ]
 
     const flatItems = this.flattenHierarchy(items)
 
     const csvContent = [
       headers.join(';'),
-      ...flatItems.map(item => [
-        item.number,
-        item.contractor,
-        item.materialType,
-        item.workDescription,
-        item.unit,
-        item.volume?.toString().replace('.', ',') || '',
-        item.materialCoeff?.toString().replace('.', ',') || '',
-        item.workPrice?.toString().replace('.', ',') || '',
-        item.materialPriceWithVAT?.toString().replace('.', ',') || '',
-        item.deliveryPrice?.toString().replace('.', ',') || '',
-        item.total.toString().replace('.', ',')
-      ].join(';'))
+      ...flatItems.map(item =>
+        [
+          item.number,
+          item.contractor,
+          item.materialType,
+          item.workDescription,
+          item.unit,
+          item.volume?.toString().replace('.', ',') || '',
+          item.materialCoeff?.toString().replace('.', ',') || '',
+          item.workPrice?.toString().replace('.', ',') || '',
+          item.materialPriceWithVAT?.toString().replace('.', ',') || '',
+          item.deliveryPrice?.toString().replace('.', ',') || '',
+          item.total.toString().replace('.', ','),
+        ].join(';')
+      ),
     ].join('\n')
 
     console.log('CSV Parser: Экспорт в CSV завершен', {
       itemsCount: flatItems.length,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     })
 
     return csvContent

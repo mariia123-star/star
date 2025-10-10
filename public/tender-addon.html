@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Надстройка для Тендер Тест - STAR Portal</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+          Cantarell, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      .container {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        max-width: 900px;
+        width: 100%;
+        padding: 40px;
+      }
+
+      h1 {
+        color: #333;
+        margin-bottom: 10px;
+        font-size: 28px;
+      }
+
+      .subtitle {
+        color: #666;
+        margin-bottom: 30px;
+        font-size: 14px;
+      }
+
+      .section {
+        margin-bottom: 30px;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #667eea;
+      }
+
+      .section h2 {
+        color: #333;
+        font-size: 18px;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .section h2::before {
+        content: '⚙️';
+        font-size: 20px;
+      }
+
+      .feature-list {
+        list-style: none;
+        margin-top: 15px;
+      }
+
+      .feature-list li {
+        padding: 10px 0;
+        padding-left: 30px;
+        position: relative;
+        color: #555;
+      }
+
+      .feature-list li::before {
+        content: '✓';
+        position: absolute;
+        left: 0;
+        color: #667eea;
+        font-weight: bold;
+        font-size: 18px;
+      }
+
+      .warning {
+        background: #fff3cd;
+        border-left-color: #ffc107;
+        color: #856404;
+      }
+
+      .warning h2::before {
+        content: '⚠️';
+      }
+
+      .info {
+        background: #d1ecf1;
+        border-left-color: #17a2b8;
+        color: #0c5460;
+      }
+
+      .info h2::before {
+        content: 'ℹ️';
+      }
+
+      .install-btn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 15px 30px;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        width: 100%;
+        margin-top: 20px;
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+      }
+
+      .install-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+      }
+
+      .install-btn:active {
+        transform: translateY(0);
+      }
+
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      }
+
+      .modal.active {
+        display: flex;
+      }
+
+      .modal-content {
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        max-width: 900px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+      }
+
+      .modal-content h3 {
+        margin-bottom: 20px;
+        color: #333;
+      }
+
+      .modal-content textarea {
+        width: 100%;
+        height: 400px;
+        padding: 15px;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        resize: vertical;
+      }
+
+      .modal-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+      }
+
+      .modal-buttons button {
+        flex: 1;
+        padding: 12px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .copy-btn {
+        background: #667eea;
+        color: white;
+      }
+
+      .copy-btn:hover {
+        background: #5568d3;
+      }
+
+      .close-btn {
+        background: #e2e8f0;
+        color: #333;
+      }
+
+      .close-btn:hover {
+        background: #cbd5e0;
+      }
+
+      .step {
+        background: white;
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 8px;
+        border-left: 4px solid #667eea;
+      }
+
+      .step-number {
+        display: inline-block;
+        background: #667eea;
+        color: white;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 28px;
+        margin-right: 10px;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔧 Надстройка для Тендер Тест</h1>
+      <p class="subtitle">
+        Расширение функциональности работы со сметами в STAR Portal
+      </p>
+
+      <div class="section">
+        <h2>Новые возможности</h2>
+        <ul class="feature-list">
+          <li>
+            Отключение автоматического добавления строк при выборе проекта
+          </li>
+          <li>Ручное управление добавлением позиций сметы</li>
+          <li>Модальное окно выбора расценок из сборника</li>
+          <li>Поиск по коду и наименованию работ</li>
+          <li>Автоматическое заполнение полей выбранной расценкой</li>
+          <li>Интеграция со сборником расценок РСЦ</li>
+        </ul>
+      </div>
+
+      <div class="section info">
+        <h2>Требования</h2>
+        <ul class="feature-list">
+          <li>Браузерное расширение Tampermonkey или Violentmonkey</li>
+          <li>
+            Доступ к порталу STAR (http://localhost:5173 или
+            http://10.8.0.10:5173)
+          </li>
+          <li>Открытая страница /documents/tender-test</li>
+        </ul>
+      </div>
+
+      <div class="section warning">
+        <h2>Инструкция по установке</h2>
+
+        <div class="step">
+          <span class="step-number">1</span>
+          <strong>Установите расширение для браузера</strong>
+          <ul class="feature-list" style="margin-top: 10px">
+            <li>
+              Chrome/Edge:
+              <a
+                href="https://chrome.google.com/webstore/detail/tampermonkey"
+                target="_blank"
+                >Tampermonkey</a
+              >
+            </li>
+            <li>
+              Firefox:
+              <a
+                href="https://addons.mozilla.org/firefox/addon/tampermonkey/"
+                target="_blank"
+                >Tampermonkey</a
+              >
+            </li>
+          </ul>
+        </div>
+
+        <div class="step">
+          <span class="step-number">2</span>
+          <strong>Получите код надстройки</strong>
+          <p style="margin-top: 10px; color: #666">
+            Нажмите кнопку ниже, чтобы открыть окно с кодом скрипта
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="step-number">3</span>
+          <strong>Создайте новый скрипт</strong>
+          <p style="margin-top: 10px; color: #666">
+            Откройте Tampermonkey → Создать новый скрипт
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="step-number">4</span>
+          <strong>Вставьте код</strong>
+          <p style="margin-top: 10px; color: #666">
+            Скопируйте код из окна и вставьте в редактор Tampermonkey
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="step-number">5</span>
+          <strong>Сохраните и активируйте</strong>
+          <p style="margin-top: 10px; color: #666">
+            Сохраните скрипт (Ctrl+S) и перезагрузите страницу портала
+          </p>
+        </div>
+      </div>
+
+      <button class="install-btn" onclick="showScript()">
+        📋 Показать код надстройки
+      </button>
+    </div>
+
+    <div class="modal" id="scriptModal">
+      <div class="modal-content">
+        <h3>🔧 Код UserScript для Tampermonkey</h3>
+        <p style="color: #666; margin-bottom: 15px">
+          Скопируйте этот код полностью и вставьте в новый скрипт Tampermonkey
+        </p>
+        <textarea id="scriptCode" readonly>
+// ==UserScript==
+// @name         STAR Portal - Тендер Тест Улучшенный
+// @namespace    http://tampermonkey.net/
+// @version      1.0.0
+// @description  Отключение автодобавления строк и добавление выбора из сборника расценок
+// @author       STAR Team
+// @match        http://localhost:5173/documents/tender-test
+// @match        http://10.8.0.10:5173/documents/tender-test
+// @match        http://192.168.8.167:5173/documents/tender-test
+// @grant        none
+// @run-at       document-end
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    console.log('%c[STAR Addon] Надстройка Тендер Тест загружена', 'color: #667eea; font-weight: bold;');
+
+    // Сборник расценок РСЦ (расширенный)
+    const priceBook = [
+        { id: 1, code: 'РСЦ-001', name: 'Земляные работы, выемка грунта экскаватором', unit: 'м³', price: 450, category: 'Земляные работы' },
+        { id: 2, code: 'РСЦ-002', name: 'Укладка бетона класса В15 (М200)', unit: 'м³', price: 3200, category: 'Бетонные работы' },
+        { id: 3, code: 'РСЦ-003', name: 'Монтаж арматуры А400', unit: 'т', price: 18500, category: 'Арматурные работы' },
+        { id: 4, code: 'РСЦ-004', name: 'Кирпичная кладка стен', unit: 'м³', price: 2800, category: 'Каменные работы' },
+        { id: 5, code: 'РСЦ-005', name: 'Штукатурные работы по кирпичу', unit: 'м²', price: 380, category: 'Отделочные работы' },
+        { id: 6, code: 'РСЦ-006', name: 'Малярные работы, окраска водоэмульсионной краской', unit: 'м²', price: 250, category: 'Отделочные работы' },
+        { id: 7, code: 'РСЦ-007', name: 'Устройство цементно-песчаной стяжки', unit: 'м²', price: 420, category: 'Бетонные работы' },
+        { id: 8, code: 'РСЦ-008', name: 'Монтаж окон ПВХ с двухкамерным стеклопакетом', unit: 'шт', price: 5500, category: 'Столярные работы' },
+        { id: 9, code: 'РСЦ-009', name: 'Установка дверей межкомнатных', unit: 'шт', price: 3200, category: 'Столярные работы' },
+        { id: 10, code: 'РСЦ-010', name: 'Монтаж гипсокартонных перегородок', unit: 'м²', price: 680, category: 'Отделочные работы' },
+        { id: 11, code: 'РСЦ-011', name: 'Устройство наливного пола', unit: 'м²', price: 520, category: 'Отделочные работы' },
+        { id: 12, code: 'РСЦ-012', name: 'Монтаж натяжных потолков', unit: 'м²', price: 450, category: 'Отделочные работы' },
+        { id: 13, code: 'РСЦ-013', name: 'Облицовка стен керамической плиткой', unit: 'м²', price: 890, category: 'Отделочные работы' },
+        { id: 14, code: 'РСЦ-014', name: 'Устройство кровли из металлочерепицы', unit: 'м²', price: 650, category: 'Кровельные работы' },
+        { id: 15, code: 'РСЦ-015', name: 'Монтаж системы водоснабжения', unit: 'м', price: 420, category: 'Сантехнические работы' }
+    ];
+
+    // Стили для модального окна
+    const styles = `
+        #starPriceModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #starPriceModal.active {
+            display: flex !important;
+        }
+
+        .star-modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            max-width: 900px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .star-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .star-modal-header h2 {
+            color: #333;
+            font-size: 24px;
+            margin: 0;
+        }
+
+        .star-close-btn {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #999;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .star-close-btn:hover {
+            background: #f3f4f6;
+            color: #333;
+        }
+
+        .star-search-box {
+            width: 100%;
+            padding: 14px 20px;
+            margin-bottom: 20px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 15px;
+            transition: border-color 0.2s;
+        }
+
+        .star-search-box:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .star-price-item {
+            padding: 18px;
+            margin-bottom: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .star-price-item:hover {
+            border-color: #667eea;
+            background: #f7fafc;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+        }
+
+        .star-price-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 8px;
+        }
+
+        .star-price-code {
+            font-weight: 600;
+            color: #667eea;
+            font-size: 14px;
+            margin-bottom: 6px;
+        }
+
+        .star-price-name {
+            color: #333;
+            font-size: 15px;
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+
+        .star-price-category {
+            display: inline-block;
+            background: #f3f4f6;
+            color: #666;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .star-price-meta {
+            display: flex;
+            gap: 20px;
+            color: #666;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+
+        .star-price-value {
+            text-align: right;
+            font-weight: 700;
+            color: #667eea;
+            font-size: 20px;
+        }
+
+        .star-empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .star-empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+    `;
+
+    // Добавляем стили на страницу
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = styles;
+    document.head.appendChild(styleSheet);
+
+    // Создание модального окна
+    function createPriceModal() {
+        const modal = document.createElement('div');
+        modal.id = 'starPriceModal';
+
+        modal.innerHTML = `
+            <div class="star-modal-content">
+                <div class="star-modal-header">
+                    <h2>📋 Сборник расценок РСЦ</h2>
+                    <button class="star-close-btn" onclick="this.closest('#starPriceModal').classList.remove('active')">×</button>
+                </div>
+                <input
+                    type="text"
+                    id="starPriceSearch"
+                    class="star-search-box"
+                    placeholder="🔍 Поиск по коду, наименованию или категории..."
+                >
+                <div id="starPriceList"></div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        return modal;
+    }
+
+    // Отображение списка расценок
+    function renderPriceList(searchTerm = '') {
+        const priceList = document.getElementById('starPriceList');
+        if (!priceList) return;
+
+        const search = searchTerm.toLowerCase();
+        const filtered = priceBook.filter(item =>
+            item.code.toLowerCase().includes(search) ||
+            item.name.toLowerCase().includes(search) ||
+            item.category.toLowerCase().includes(search)
+        );
+
+        if (filtered.length === 0) {
+            priceList.innerHTML = `
+                <div class="star-empty-state">
+                    <div class="star-empty-state-icon">🔍</div>
+                    <div>Расценки не найдены</div>
+                </div>
+            `;
+            return;
+        }
+
+        priceList.innerHTML = filtered.map(item => `
+            <div class="star-price-item" data-id="${item.id}">
+                <div class="star-price-header">
+                    <div style="flex: 1;">
+                        <div class="star-price-code">${item.code}</div>
+                        <div class="star-price-name">${item.name}</div>
+                        <span class="star-price-category">${item.category}</span>
+                        <div class="star-price-meta">
+                            <span>📏 ${item.unit}</span>
+                        </div>
+                    </div>
+                    <div class="star-price-value">
+                        ${item.price.toLocaleString('ru-RU')} ₽
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        // Добавляем обработчики клика
+        priceList.querySelectorAll('.star-price-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const id = parseInt(this.dataset.id);
+                const selected = priceBook.find(p => p.id === id);
+                if (selected) selectPrice(selected);
+            });
+        });
+    }
+
+    // Выбор расценки и заполнение формы
+    function selectPrice(price) {
+        console.log('%c[STAR Addon] Выбрана расценка:', 'color: #48bb78;', price);
+
+        // Ищем поля формы - адаптируйте селекторы под вашу форму
+        const fields = {
+            code: document.querySelector('input[placeholder*="Код"], input[name*="code"]'),
+            name: document.querySelector('input[placeholder*="Наименование"], textarea[name*="name"], input[name*="name"]'),
+            unit: document.querySelector('select[name*="unit"], input[name*="unit"]'),
+            price: document.querySelector('input[placeholder*="Цена"], input[name*="price"], input[type="number"]')
+        };
+
+        // Заполняем поля
+        if (fields.code) {
+            fields.code.value = price.code;
+            fields.code.dispatchEvent(new Event('input', { bubbles: true }));
+            fields.code.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        if (fields.name) {
+            fields.name.value = price.name;
+            fields.name.dispatchEvent(new Event('input', { bubbles: true }));
+            fields.name.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        if (fields.unit) {
+            if (fields.unit.tagName === 'SELECT') {
+                // Поиск опции по тексту
+                const option = Array.from(fields.unit.options).find(opt =>
+                    opt.text.includes(price.unit) || opt.value === price.unit
+                );
+                if (option) fields.unit.value = option.value;
+            } else {
+                fields.unit.value = price.unit;
+            }
+            fields.unit.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        if (fields.price) {
+            fields.price.value = price.price;
+            fields.price.dispatchEvent(new Event('input', { bubbles: true }));
+            fields.price.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        // Закрываем модальное окно
+        document.getElementById('starPriceModal').classList.remove('active');
+
+        // Уведомление об успехе
+        console.log('%c[STAR Addon] Форма заполнена успешно', 'color: #48bb78; font-weight: bold;');
+    }
+
+    // Инициализация
+    function init() {
+        console.log('%c[STAR Addon] Инициализация...', 'color: #667eea;');
+
+        // Создаем модальное окно
+        const modal = createPriceModal();
+
+        // Поиск
+        const searchInput = document.getElementById('starPriceSearch');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                renderPriceList(e.target.value);
+            });
+        }
+
+        // Закрытие по клику вне окна
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('active');
+            }
+        });
+
+        // Ищем кнопку добавления расценки
+        // Адаптируйте селектор под вашу кнопку
+        const addButtons = document.querySelectorAll('button[class*="add"], button[class*="Add"], button:contains("Добавить")');
+
+        addButtons.forEach(btn => {
+            const btnText = btn.textContent.toLowerCase();
+            if (btnText.includes('добавить') || btnText.includes('расценк')) {
+                btn.addEventListener('click', (e) => {
+                    // Показываем модальное окно вместо стандартного действия
+                    modal.classList.add('active');
+                    renderPriceList();
+                    console.log('%c[STAR Addon] Открыто окно выбора расценок', 'color: #667eea;');
+                }, { capture: true });
+            }
+        });
+
+        // Горячая клавиша для открытия (Ctrl+Shift+P)
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.shiftKey && e.key === 'P') {
+                e.preventDefault();
+                modal.classList.add('active');
+                renderPriceList();
+                searchInput?.focus();
+            }
+        });
+
+        console.log('%c[STAR Addon] ✓ Инициализация завершена', 'color: #48bb78; font-weight: bold;');
+        console.log('%c[STAR Addon] Используйте Ctrl+Shift+P для быстрого открытия сборника расценок', 'color: #666;');
+    }
+
+    // Запуск после полной загрузки
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        setTimeout(init, 500); // Небольшая задержка для загрузки React
+    }
+
+    // Наблюдатель за динамическими изменениями
+    const observer = new MutationObserver((mutations) => {
+        // Переинициализация при существенных изменениях DOM
+        const hasSignificantChanges = mutations.some(m =>
+            m.addedNodes.length > 0 &&
+            Array.from(m.addedNodes).some(n => n.nodeType === 1)
+        );
+
+        if (hasSignificantChanges) {
+            console.log('%c[STAR Addon] Обнаружены изменения DOM, переинициализация...', 'color: #fbbf24;');
+            setTimeout(init, 200);
+        }
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+
+})();</textarea
+        >
+        <div class="modal-buttons">
+          <button class="copy-btn" onclick="copyScript()">
+            📋 Копировать код
+          </button>
+          <button class="close-btn" onclick="closeModal()">Закрыть</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function showScript() {
+        document.getElementById('scriptModal').classList.add('active')
+      }
+
+      function closeModal() {
+        document.getElementById('scriptModal').classList.remove('active')
+      }
+
+      function copyScript() {
+        const textarea = document.getElementById('scriptCode')
+        textarea.select()
+        document.execCommand('copy')
+
+        const btn = event.target
+        const originalText = btn.textContent
+        btn.textContent = '✓ Скопировано!'
+        btn.style.background = '#48bb78'
+
+        setTimeout(() => {
+          btn.textContent = originalText
+          btn.style.background = '#667eea'
+        }, 2000)
+      }
+
+      // Закрытие модального окна по клику вне его
+      document
+        .getElementById('scriptModal')
+        .addEventListener('click', function (e) {
+          if (e.target === this) {
+            closeModal()
+          }
+        })
+
+      // Закрытие по Escape
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          closeModal()
+        }
+      })
+    </script>
+  </body>
+</html>

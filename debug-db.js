@@ -3,11 +3,11 @@
 
 async function debugTenderEstimates() {
   console.log('=== Диагностика таблицы tender_estimates ===')
-  
+
   try {
     // Получаем Supabase клиент из глобального контекста
     const supabase = window._supabaseClient || window.supabase
-    
+
     if (!supabase) {
       console.error('Supabase клиент не найден в глобальном контексте')
       return
@@ -34,14 +34,14 @@ async function debugTenderEstimates() {
       console.error('Ошибка получения записей:', allError)
     } else {
       console.log(`Получено записей: ${allRecords?.length || 0}`)
-      
+
       // Группировка по record_type
       const groupedByType = {}
       allRecords?.forEach(record => {
         const type = record.record_type || 'NULL'
         groupedByType[type] = (groupedByType[type] || 0) + 1
       })
-      
+
       console.log('Группировка по record_type:')
       Object.entries(groupedByType).forEach(([type, count]) => {
         console.log(`  ${type}: ${count}`)
@@ -71,19 +71,23 @@ async function debugTenderEstimates() {
 
     console.log('4. Проверка структуры таблицы через introspection...')
     try {
-      const { data: tableInfo, error: tableError } = await supabase
-        .rpc('pg_get_tabledef', { table_name: 'tender_estimates' })
-      
+      const { data: tableInfo, error: tableError } = await supabase.rpc(
+        'pg_get_tabledef',
+        { table_name: 'tender_estimates' }
+      )
+
       if (tableError) {
-        console.log('RPC функция pg_get_tabledef недоступна, используем альтернативный метод')
-        
+        console.log(
+          'RPC функция pg_get_tabledef недоступна, используем альтернативный метод'
+        )
+
         // Альтернативный способ - попробуем получить информацию о колонках через select
         const { data: sampleRecord, error: sampleError } = await supabase
           .from('tender_estimates')
           .select('*')
           .limit(1)
           .single()
-        
+
         if (!sampleError && sampleRecord) {
           console.log('Структура таблицы (по образцу записи):')
           Object.keys(sampleRecord).forEach(field => {
@@ -103,18 +107,21 @@ async function debugTenderEstimates() {
     console.log('5. Проверка наличия новых полей...')
     const { data: fieldsTest, error: fieldsError } = await supabase
       .from('tender_estimates')
-      .select('record_type, material_type, coefficient, work_price, material_price, delivery_cost')
+      .select(
+        'record_type, material_type, coefficient, work_price, material_price, delivery_cost'
+      )
       .limit(1)
 
     if (fieldsError) {
       console.error('Ошибка при проверке новых полей:', fieldsError)
-      console.log('Возможно, поля record_type, material_type, coefficient, work_price, material_price, delivery_cost не существуют в таблице')
+      console.log(
+        'Возможно, поля record_type, material_type, coefficient, work_price, material_price, delivery_cost не существуют в таблице'
+      )
     } else {
       console.log('Новые поля доступны:', fieldsTest)
     }
 
     console.log('=== Диагностика завершена ===')
-
   } catch (error) {
     console.error('Общая ошибка при диагностике:', error)
   }

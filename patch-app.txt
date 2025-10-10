@@ -1,0 +1,22 @@
+Добавьте в src/app/App.tsx:
+
+1. После строки 10 добавьте:
+import EstimateCalculatorDemo from '@/pages/documents/EstimateCalculatorDemo'
+
+2. После строки 56 добавьте:
+<Route
+  path="/documents/calculator"
+  element={<EstimateCalculatorDemo />}
+/>
+
+---
+
+Добавьте в src/layout/MainLayout.tsx:
+
+В массив children секции 'documents' (после строки 50) добавьте:
+{
+  key: '/documents/calculator',
+  icon: <CalculatorOutlined />,
+  label: 'Калькулятор смет',
+  className: 'sub-menu-item',
+},

@@ -1,7 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import {
-  PERFORMANCE_THRESHOLDS,
-} from '@/shared/lib/cache-config'
+import { PERFORMANCE_THRESHOLDS } from '@/shared/lib/cache-config'
 
 export interface TenderEstimate {
   id: string
@@ -16,13 +14,13 @@ export interface TenderEstimate {
   created_at: string
   updated_at: string
   // Новые поля для расширенной тендерной сметы
-  material_type?: string       // Тип материала (Основ/Вспом)
-  coefficient?: number         // Коэффициент расхода материала
-  work_price?: number         // Цена работы за единицу
-  material_price?: number     // Цена материала с НДС
-  delivery_cost?: number      // Стоимость доставки
-  record_type?: 'work' | 'material' | 'summary'  // Тип записи
-  project_id?: string         // ID проекта
+  material_type?: string // Тип материала (Основ/Вспом)
+  coefficient?: number // Коэффициент расхода материала
+  work_price?: number // Цена работы за единицу
+  material_price?: number // Цена материала с НДС
+  delivery_cost?: number // Стоимость доставки
+  record_type?: 'work' | 'material' | 'summary' // Тип записи
+  project_id?: string // ID проекта
 }
 
 export interface TenderEstimateWithUnit extends TenderEstimate {
@@ -41,13 +39,13 @@ export interface TenderEstimateCreate {
   unit_price?: number
   notes?: string
   // Новые поля для создания расширенной тендерной сметы
-  material_type?: string       // Тип материала (Основ/Вспом)
-  coefficient?: number         // Коэффициент расхода материала
-  work_price?: number         // Цена работы за единицу
-  material_price?: number     // Цена материала с НДС
-  delivery_cost?: number      // Стоимость доставки
-  record_type?: 'work' | 'material' | 'summary'  // Тип записи
-  project_id?: string         // ID проекта
+  material_type?: string // Тип материала (Основ/Вспом)
+  coefficient?: number // Коэффициент расхода материала
+  work_price?: number // Цена работы за единицу
+  material_price?: number // Цена материала с НДС
+  delivery_cost?: number // Стоимость доставки
+  record_type?: 'work' | 'material' | 'summary' // Тип записи
+  project_id?: string // ID проекта
 }
 
 export interface TenderEstimateUpdate {
@@ -59,13 +57,13 @@ export interface TenderEstimateUpdate {
   notes?: string
   is_active?: boolean
   // Новые поля для обновления расширенной тендерной сметы
-  material_type?: string       // Тип материала (Основ/Вспом)
-  coefficient?: number         // Коэффициент расхода материала
-  work_price?: number         // Цена работы за единицу
-  material_price?: number     // Цена материала с НДС
-  delivery_cost?: number      // Стоимость доставки
-  record_type?: 'work' | 'material' | 'summary'  // Тип записи
-  project_id?: string         // ID проекта
+  material_type?: string // Тип материала (Основ/Вспом)
+  coefficient?: number // Коэффициент расхода материала
+  work_price?: number // Цена работы за единицу
+  material_price?: number // Цена материала с НДС
+  delivery_cost?: number // Стоимость доставки
+  record_type?: 'work' | 'material' | 'summary' // Тип записи
+  project_id?: string // ID проекта
 }
 
 export interface TenderEstimateFilters {
@@ -121,10 +119,12 @@ export const tenderEstimatesApi = {
     // Используем базовую таблицу с JOIN для получения данных о единицах
     let query = supabase
       .from('tender_estimates')
-      .select(`
+      .select(
+        `
         *,
         unit:units(id, name, short_name)
-      `)
+      `
+      )
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
@@ -316,16 +316,20 @@ export const tenderEstimatesApi = {
     // Используем простой поиск по базовой таблице
     let query = supabase
       .from('tender_estimates')
-      .select(`
+      .select(
+        `
         *,
         unit:units(id, name, short_name)
-      `)
+      `
+      )
       .eq('is_active', true)
       .limit(limit)
-    
+
     // Поиск по материалам и работам
     if (searchQuery && searchQuery.trim()) {
-      query = query.or(`materials.ilike.%${searchQuery}%,works.ilike.%${searchQuery}%,notes.ilike.%${searchQuery}%`)
+      query = query.or(
+        `materials.ilike.%${searchQuery}%,works.ilike.%${searchQuery}%,notes.ilike.%${searchQuery}%`
+      )
     }
 
     const { data, error } = await query
@@ -521,7 +525,9 @@ export const tenderEstimatesApi = {
     }
 
     if (search && search.trim()) {
-      query = query.or(`materials.ilike.%${search}%,works.ilike.%${search}%,notes.ilike.%${search}%`)
+      query = query.or(
+        `materials.ilike.%${search}%,works.ilike.%${search}%,notes.ilike.%${search}%`
+      )
     }
 
     if (dateRange) {

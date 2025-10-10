@@ -9,14 +9,14 @@ const mockRates: RateWithUnit[] = [
     name: 'Кирпич керамический лицевой',
     description: 'Кирпич керамический лицевой одинарный М150',
     unit_id: 'mock-unit-1',
-    base_price: 25.50,
+    base_price: 25.5,
     category: 'материал',
     subcategory: 'кирпич',
     is_active: true,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
     unit_name: 'штука',
-    unit_short_name: 'шт'
+    unit_short_name: 'шт',
   },
   {
     id: 'mock-rate-2',
@@ -24,14 +24,14 @@ const mockRates: RateWithUnit[] = [
     name: 'Цемент М500',
     description: 'Цемент портландский М500 Д0',
     unit_id: 'mock-unit-2',
-    base_price: 450.00,
+    base_price: 450.0,
     category: 'материал',
     subcategory: 'вяжущие',
     is_active: true,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
     unit_name: 'килограмм',
-    unit_short_name: 'кг'
+    unit_short_name: 'кг',
   },
   {
     id: 'mock-rate-3',
@@ -39,15 +39,15 @@ const mockRates: RateWithUnit[] = [
     name: 'Кладка кирпичная',
     description: 'Кладка стен из керамического кирпича на цементном растворе',
     unit_id: 'mock-unit-3',
-    base_price: 3500.00,
+    base_price: 3500.0,
     category: 'общестроительные_работы',
     subcategory: 'каменные работы',
     is_active: true,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
     unit_name: 'метр кубический',
-    unit_short_name: 'м³'
-  }
+    unit_short_name: 'м³',
+  },
 ]
 
 export const ratesApi = {
@@ -62,7 +62,7 @@ export const ratesApi = {
         success: true,
         dataCount: mockRates.length,
       })
-      
+
       return Promise.resolve(mockRates)
     }
 
@@ -168,7 +168,7 @@ export const ratesApi = {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
-      
+
       console.log('API Request:', {
         table: 'rates',
         action: 'create',
@@ -177,7 +177,7 @@ export const ratesApi = {
         timestamp: new Date().toISOString(),
         success: true,
       })
-      
+
       // Добавляем в mock массив
       const mockUnit = { name: 'штука', short_name: 'шт' } // Получили бы из units API
       mockRates.push({
@@ -185,7 +185,7 @@ export const ratesApi = {
         unit_name: mockUnit.name,
         unit_short_name: mockUnit.short_name,
       })
-      
+
       return Promise.resolve(mockRate)
     }
 

@@ -1,11 +1,21 @@
 import { useState } from 'react'
-import { Card, Button, Typography, Space, Statistic, Row, Col, App, Select } from 'antd'
+import {
+  Card,
+  Button,
+  Typography,
+  Space,
+  Statistic,
+  Row,
+  Col,
+  App,
+  Select,
+} from 'antd'
 import {
   PlusOutlined,
   CalculatorOutlined,
   FileTextOutlined,
   DownloadOutlined,
-  SaveOutlined
+  SaveOutlined,
 } from '@ant-design/icons'
 import { RateGroup, RatePosition, RATE_COLORS } from '@/shared/types/estimate'
 import RateBlock from './RateBlock'
@@ -31,7 +41,10 @@ interface RateConsoleProps {
 
 const calculateGroupTotal = (group: RateGroup): number => {
   const worksCost = group.works.reduce((sum, work) => sum + work.total, 0)
-  const materialsCost = group.materials.reduce((sum, material) => sum + material.total, 0)
+  const materialsCost = group.materials.reduce(
+    (sum, material) => sum + material.total,
+    0
+  )
   return worksCost + materialsCost
 }
 
@@ -44,7 +57,7 @@ const formatCurrency = (amount: number): string => {
     style: 'currency',
     currency: 'RUB',
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0
+    maximumFractionDigits: 0,
   })
 }
 
@@ -63,7 +76,7 @@ const generateTestData = (): RateGroup[] => [
       materialPrice: 0,
       deliveryPrice: 0,
       total: 55040,
-      groupId: 'group-1'
+      groupId: 'group-1',
     },
     works: [
       {
@@ -77,8 +90,8 @@ const generateTestData = (): RateGroup[] => [
         materialPrice: 0,
         deliveryPrice: 0,
         total: 55040,
-        groupId: 'group-1'
-      }
+        groupId: 'group-1',
+      },
     ],
     materials: [
       {
@@ -93,7 +106,7 @@ const generateTestData = (): RateGroup[] => [
         materialPrice: 10000,
         deliveryPrice: 0,
         total: 6720,
-        groupId: 'group-1'
+        groupId: 'group-1',
       },
       {
         id: 'material-1-2',
@@ -107,11 +120,11 @@ const generateTestData = (): RateGroup[] => [
         materialPrice: 500,
         deliveryPrice: 0,
         total: 6020,
-        groupId: 'group-1'
-      }
+        groupId: 'group-1',
+      },
     ],
     totalSum: 67780,
-    isExpanded: true
+    isExpanded: true,
   },
   {
     id: 'group-2',
@@ -126,7 +139,7 @@ const generateTestData = (): RateGroup[] => [
       materialPrice: 0,
       deliveryPrice: 0,
       total: 114750,
-      groupId: 'group-2'
+      groupId: 'group-2',
     },
     works: [
       {
@@ -140,7 +153,7 @@ const generateTestData = (): RateGroup[] => [
         materialPrice: 0,
         deliveryPrice: 0,
         total: 72250,
-        groupId: 'group-2'
+        groupId: 'group-2',
       },
       {
         id: 'work-2-2',
@@ -153,8 +166,8 @@ const generateTestData = (): RateGroup[] => [
         materialPrice: 0,
         deliveryPrice: 0,
         total: 42075,
-        groupId: 'group-2'
-      }
+        groupId: 'group-2',
+      },
     ],
     materials: [
       {
@@ -169,19 +182,21 @@ const generateTestData = (): RateGroup[] => [
         materialPrice: 5500,
         deliveryPrice: 275,
         total: 154613,
-        groupId: 'group-2'
-      }
+        groupId: 'group-2',
+      },
     ],
     totalSum: 268938,
-    isExpanded: false
-  }
+    isExpanded: false,
+  },
 ]
 
 export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
   const { message } = App.useApp()
   const [groups, setGroups] = useState<RateGroup[]>(generateTestData)
   const [isAddModalVisible, setIsAddModalVisible] = useState(false)
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    null
+  )
   const [exportingGroup, setExportingGroup] = useState<string | null>(null)
 
   // Загружаем данные для экспорта
@@ -215,16 +230,16 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
         contractor: {
           ...groupToDuplicate.contractor,
           id: `${groupToDuplicate.contractor.id}-copy`,
-          name: `${groupToDuplicate.contractor.name} (копия)`
+          name: `${groupToDuplicate.contractor.name} (копия)`,
         },
         works: groupToDuplicate.works.map(work => ({
           ...work,
-          id: `${work.id}-copy`
+          id: `${work.id}-copy`,
         })),
         materials: groupToDuplicate.materials.map(material => ({
           ...material,
-          id: `${material.id}-copy`
-        }))
+          id: `${material.id}-copy`,
+        })),
       }
       setGroups(prev => [...prev, newGroup])
       message.success('Группа расценок дублирована')
@@ -232,7 +247,10 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
     }
   }
 
-  const handleUpdatePosition = (positionId: string, updates: Partial<RatePosition>) => {
+  const handleUpdatePosition = (
+    positionId: string,
+    updates: Partial<RatePosition>
+  ) => {
     setGroups(prev => {
       return prev.map(group => {
         // Обновляем заказчика
@@ -243,8 +261,8 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
             contractor: updatedContractor,
             totalSum: calculateGroupTotal({
               ...group,
-              contractor: updatedContractor
-            })
+              contractor: updatedContractor,
+            }),
           }
         }
 
@@ -259,7 +277,10 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
         )
 
         // Если что-то изменилось, пересчитываем итог
-        if (updatedWorks !== group.works || updatedMaterials !== group.materials) {
+        if (
+          updatedWorks !== group.works ||
+          updatedMaterials !== group.materials
+        ) {
           return {
             ...group,
             works: updatedWorks,
@@ -267,8 +288,8 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
             totalSum: calculateGroupTotal({
               ...group,
               works: updatedWorks,
-              materials: updatedMaterials
-            })
+              materials: updatedMaterials,
+            }),
           }
         }
 
@@ -328,7 +349,7 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
             material_price: 0,
             delivery_cost: 0,
             record_type: 'contractor' as const,
-            project_id: selectedProjectId
+            project_id: selectedProjectId,
           }
 
           await tenderEstimatesApi.create(contractorRecord)
@@ -350,7 +371,7 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
               material_price: 0,
               delivery_cost: 0,
               record_type: 'work' as const,
-              project_id: selectedProjectId
+              project_id: selectedProjectId,
             }
             await tenderEstimatesApi.create(workRecord)
             totalSuccess++
@@ -372,7 +393,7 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
               material_price: material.materialPrice,
               delivery_cost: material.deliveryPrice,
               record_type: 'material' as const,
-              project_id: selectedProjectId
+              project_id: selectedProjectId,
             }
             await tenderEstimatesApi.create(materialRecord)
             totalSuccess++
@@ -384,12 +405,13 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
       }
 
       if (totalSuccess > 0) {
-        message.success(`Все расценки сохранены: ${totalSuccess} записей добавлено`)
+        message.success(
+          `Все расценки сохранены: ${totalSuccess} записей добавлено`
+        )
         console.log('✅ Сохранение завершено:', { totalSuccess, totalErrors })
       } else {
         message.error('Не удалось сохранить ни одной записи')
       }
-
     } catch (error) {
       console.error('Ошибка сохранения всех расценок:', error)
       message.error(`Ошибка сохранения: ${error}`)
@@ -439,7 +461,7 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
         material_price: 0,
         delivery_cost: 0,
         record_type: 'summary' as const,
-        project_id: selectedProjectId
+        project_id: selectedProjectId,
       }
       estimateRecords.push(contractorRecord)
 
@@ -459,7 +481,7 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
           material_price: 0,
           delivery_cost: 0,
           record_type: 'work' as const,
-          project_id: selectedProjectId
+          project_id: selectedProjectId,
         }
         estimateRecords.push(workRecord)
       }
@@ -480,7 +502,7 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
           material_price: material.materialPrice,
           delivery_cost: material.deliveryPrice,
           record_type: 'material' as const,
-          project_id: selectedProjectId
+          project_id: selectedProjectId,
         }
         estimateRecords.push(materialRecord)
       }
@@ -501,12 +523,13 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
       }
 
       if (successCount > 0) {
-        message.success(`Группа расценок экспортирована в смету: ${successCount} записей добавлено`)
+        message.success(
+          `Группа расценок экспортирована в смету: ${successCount} записей добавлено`
+        )
         console.log('✅ Экспорт завершен:', { successCount, errorCount })
       } else {
         message.error('Не удалось экспортировать ни одной записи')
       }
-
     } catch (error) {
       console.error('Ошибка экспорта в смету:', error)
       message.error(`Ошибка экспорта: ${error}`)
@@ -517,32 +540,60 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
 
   // Вспомогательная функция для поиска ID единицы измерения
   const findUnitId = (unitName: string): string | null => {
-    const unit = units.find(u =>
-      u.short_name === unitName ||
-      u.name.toLowerCase().includes(unitName.toLowerCase())
+    const unit = units.find(
+      u =>
+        u.short_name === unitName ||
+        u.name.toLowerCase().includes(unitName.toLowerCase())
     )
     return unit?.id || null
   }
 
   const totalCost = getTotalCost(groups)
-  const totalWorksCost = groups.reduce((sum, group) =>
-    sum + group.works.reduce((workSum, work) => workSum + work.total, 0), 0
+  const totalWorksCost = groups.reduce(
+    (sum, group) =>
+      sum + group.works.reduce((workSum, work) => workSum + work.total, 0),
+    0
   )
-  const totalMaterialsCost = groups.reduce((sum, group) =>
-    sum + group.materials.reduce((materialSum, material) => materialSum + material.total, 0), 0
+  const totalMaterialsCost = groups.reduce(
+    (sum, group) =>
+      sum +
+      group.materials.reduce(
+        (materialSum, material) => materialSum + material.total,
+        0
+      ),
+    0
   )
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px' }}>
       {/* Заголовок */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '24px',
+        }}
+      >
         <Title level={2} style={{ margin: 0, color: '#1f2937' }}>
           <CalculatorOutlined style={{ marginRight: '12px' }} />
           Консоль управления расценками
         </Title>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-            <Text style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-end',
+            }}
+          >
+            <Text
+              style={{
+                fontSize: '12px',
+                color: '#6b7280',
+                marginBottom: '4px',
+              }}
+            >
               Проект для экспорта:
             </Text>
             <Select
@@ -554,7 +605,10 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
               onChange={setSelectedProjectId}
               filterOption={(input, option) => {
                 const project = projects.find(p => p.id === option?.value)
-                return project?.name.toLowerCase().includes(input.toLowerCase()) || false
+                return (
+                  project?.name.toLowerCase().includes(input.toLowerCase()) ||
+                  false
+                )
               }}
             >
               {projects.map(project => (
@@ -585,12 +639,15 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
       </div>
 
       {/* Сводная информация */}
-      <Card style={{ marginBottom: '24px' }} title={
-        <span>
-          <FileTextOutlined style={{ marginRight: '8px' }} />
-          Сводная информация по смете
-        </span>
-      }>
+      <Card
+        style={{ marginBottom: '24px' }}
+        title={
+          <span>
+            <FileTextOutlined style={{ marginRight: '8px' }} />
+            Сводная информация по смете
+          </span>
+        }
+      >
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} md={6}>
             <Statistic
@@ -603,7 +660,7 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
             <Statistic
               title="Стоимость работ"
               value={totalWorksCost}
-              formatter={(value) => formatCurrency(Number(value))}
+              formatter={value => formatCurrency(Number(value))}
               valueStyle={{ color: RATE_COLORS.work.background }}
             />
           </Col>
@@ -611,7 +668,7 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
             <Statistic
               title="Стоимость материалов"
               value={totalMaterialsCost}
-              formatter={(value) => formatCurrency(Number(value))}
+              formatter={value => formatCurrency(Number(value))}
               valueStyle={{ color: RATE_COLORS.materialMain.background }}
             />
           </Col>
@@ -619,7 +676,7 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
             <Statistic
               title="Общая стоимость"
               value={totalCost}
-              formatter={(value) => formatCurrency(Number(value))}
+              formatter={value => formatCurrency(Number(value))}
               valueStyle={{ color: '#1677ff', fontSize: '24px' }}
             />
           </Col>
@@ -632,12 +689,13 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
           <Card>
             <div style={{ textAlign: 'center', padding: '40px 0' }}>
               <Text type="secondary" style={{ fontSize: '16px' }}>
-                Нет добавленных расценок. Нажмите "Добавить позицию" для создания новой группы расценок.
+                Нет добавленных расценок. Нажмите "Добавить позицию" для
+                создания новой группы расценок.
               </Text>
             </div>
           </Card>
         ) : (
-          groups.map((group) => (
+          groups.map(group => (
             <RateBlock
               key={group.id}
               group={group}
@@ -658,28 +716,44 @@ export default function RateConsole({ onAddNew: _onAddNew }: RateConsoleProps) {
         <Card
           style={{
             background: '#1f2937',
-            border: 'none'
+            border: 'none',
           }}
           styles={{ body: { padding: '24px' } }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
             <div>
               <Title level={3} style={{ color: 'white', margin: 0 }}>
                 Общая стоимость сметы:
               </Title>
               <Text style={{ color: '#9ca3af' }}>
-                {groups.length} позиций | Работы: {formatCurrency(totalWorksCost)} | Материалы: {formatCurrency(totalMaterialsCost)}
+                {groups.length} позиций | Работы:{' '}
+                {formatCurrency(totalWorksCost)} | Материалы:{' '}
+                {formatCurrency(totalMaterialsCost)}
               </Text>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ color: 'white', fontSize: '32px', fontWeight: 'bold' }}>
+              <div
+                style={{ color: 'white', fontSize: '32px', fontWeight: 'bold' }}
+              >
                 {formatCurrency(totalCost)}
               </div>
               <Space>
-                <Button icon={<DownloadOutlined />} style={{ marginTop: '8px' }}>
+                <Button
+                  icon={<DownloadOutlined />}
+                  style={{ marginTop: '8px' }}
+                >
                   Экспорт в Excel
                 </Button>
-                <Button icon={<FileTextOutlined />} style={{ marginTop: '8px' }}>
+                <Button
+                  icon={<FileTextOutlined />}
+                  style={{ marginTop: '8px' }}
+                >
                   Печать сметы
                 </Button>
               </Space>

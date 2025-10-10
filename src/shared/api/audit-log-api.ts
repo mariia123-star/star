@@ -5,7 +5,16 @@ export interface AuditLogEntry {
   id: string
   user_id?: string
   session_id?: string
-  action_type: 'create' | 'update' | 'delete' | 'view' | 'export' | 'import' | 'login' | 'logout' | 'navigate'
+  action_type:
+    | 'create'
+    | 'update'
+    | 'delete'
+    | 'view'
+    | 'export'
+    | 'import'
+    | 'login'
+    | 'logout'
+    | 'navigate'
   table_name: string
   record_id?: string
   old_values?: Record<string, any>
@@ -49,13 +58,16 @@ class AuditLogApi {
       .single()
 
     if (error) {
-      console.warn('Failed to create audit log entry (table may not exist):', error)
+      console.warn(
+        'Failed to create audit log entry (table may not exist):',
+        error
+      )
       // Не выбрасываем ошибку, чтобы не нарушать основной функционал
       return {
         id: 'no-audit-table',
         action_type: logEntry.action_type,
         table_name: logEntry.table_name,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       } as AuditLogEntry
     }
 
@@ -113,7 +125,10 @@ class AuditLogApi {
       query = query.limit(filters.limit)
     }
     if (filters?.offset) {
-      query = query.range(filters.offset, (filters.offset + (filters.limit || 50)) - 1)
+      query = query.range(
+        filters.offset,
+        filters.offset + (filters.limit || 50) - 1
+      )
     }
 
     const { data, error } = await query
@@ -134,7 +149,10 @@ class AuditLogApi {
   }
 
   // Получить статистику по логам
-  async getStatistics(dateFrom?: string, dateTo?: string): Promise<{
+  async getStatistics(
+    dateFrom?: string,
+    dateTo?: string
+  ): Promise<{
     total_actions: number
     actions_by_type: Record<string, number>
     actions_by_table: Record<string, number>
@@ -163,9 +181,7 @@ class AuditLogApi {
     }
 
     // Группировка по типам действий
-    let actionsQuery = supabase
-      .from('portal_audit_log')
-      .select('action_type')
+    let actionsQuery = supabase.from('portal_audit_log').select('action_type')
 
     if (dateFrom) actionsQuery = actionsQuery.gte('created_at', dateFrom)
     if (dateTo) actionsQuery = actionsQuery.lte('created_at', dateTo)
@@ -177,16 +193,24 @@ class AuditLogApi {
       throw actionsError
     }
 
-    const actions_by_type = actionsData?.reduce((acc, item) => {
-      acc[item.action_type] = (acc[item.action_type] || 0) + 1
-      return acc
-    }, {} as Record<string, number>) || {}
+    const actions_by_type =
+      actionsData?.reduce(
+        (acc, item) => {
+          acc[item.action_type] = (acc[item.action_type] || 0) + 1
+          return acc
+        },
+        {} as Record<string, number>
+      ) || {}
 
     // Группировка по таблицам
-    const actions_by_table = actionsData?.reduce((acc, item) => {
-      acc[item.table_name] = (acc[item.table_name] || 0) + 1
-      return acc
-    }, {} as Record<string, number>) || {}
+    const actions_by_table =
+      actionsData?.reduce(
+        (acc, item) => {
+          acc[item.table_name] = (acc[item.table_name] || 0) + 1
+          return acc
+        },
+        {} as Record<string, number>
+      ) || {}
 
     console.log('Audit Log API Response: Statistics retrieved', {
       action: 'get_audit_statistics_response',
@@ -199,7 +223,7 @@ class AuditLogApi {
       total_actions: total_actions || 0,
       actions_by_type,
       actions_by_table,
-      most_active_users: [] // TODO: Implement when user system is ready
+      most_active_users: [], // TODO: Implement when user system is ready
     }
   }
 }
@@ -209,14 +233,16 @@ export const auditLogApi = new AuditLogApi()
 // Хук для автоматического логирования действий пользователя
 export const useAuditLogger = () => {
   // Получаем информацию о браузере
-  const getUserAgent = () => typeof window !== 'undefined' ? window.navigator.userAgent : undefined
-  const getPageUrl = () => typeof window !== 'undefined' ? window.location.href : undefined
+  const getUserAgent = () =>
+    typeof window !== 'undefined' ? window.navigator.userAgent : undefined
+  const getPageUrl = () =>
+    typeof window !== 'undefined' ? window.location.href : undefined
   const getSessionId = () => {
     if (typeof window === 'undefined') return undefined
-    let sessionId = sessionStorage.getItem('portal_session_id')
+    let sessionId = window.sessionStorage.getItem('portal_session_id')
     if (!sessionId) {
       sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      sessionStorage.setItem('portal_session_id', sessionId)
+      window.sessionStorage.setItem('portal_session_id', sessionId)
     }
     return sessionId
   }
@@ -247,7 +273,10 @@ export const useAuditLogger = () => {
       })
     } catch (error) {
       // Логирование не должно нарушать основной функционал - просто игнорируем ошибки
-      console.debug('Audit logging skipped (table may not exist):', { action_type, table_name })
+      console.debug('Audit logging skipped (table may not exist):', {
+        action_type,
+        table_name,
+      })
     }
   }
 

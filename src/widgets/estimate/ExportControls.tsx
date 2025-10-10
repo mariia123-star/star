@@ -10,16 +10,20 @@ import {
   Modal,
   Form,
   message,
-  Divider
+  Divider,
 } from 'antd'
 import {
   ExportOutlined,
   FileExcelOutlined,
   FilePdfOutlined,
   FileTextOutlined,
-  DownloadOutlined
+  DownloadOutlined,
 } from '@ant-design/icons'
-import { EstimateItem, EstimateCalculations, EstimateExportOptions } from '@/shared/types/estimate'
+import {
+  EstimateItem,
+  EstimateCalculations,
+  EstimateExportOptions,
+} from '@/shared/types/estimate'
 import { ExportUtils } from '@/shared/lib/exportUtils'
 
 const { Title } = Typography
@@ -34,7 +38,7 @@ interface ExportControlsProps {
 const ExportControls: React.FC<ExportControlsProps> = ({
   items,
   calculations,
-  loading = false
+  loading = false,
 }) => {
   const [isModalVisible, setIsModalVisible] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
@@ -43,7 +47,7 @@ const ExportControls: React.FC<ExportControlsProps> = ({
   const showExportModal = () => {
     console.log('ExportControls: Открываем модал экспорта', {
       itemsCount: items.length,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     })
 
     setIsModalVisible(true)
@@ -53,7 +57,7 @@ const ExportControls: React.FC<ExportControlsProps> = ({
       includeFilters: false,
       includeModifications: false,
       title: `Тендерная смета от ${new Date().toLocaleDateString('ru-RU')}`,
-      description: 'Автоматически сгенерированная смета'
+      description: 'Автоматически сгенерированная смета',
     })
   }
 
@@ -66,13 +70,13 @@ const ExportControls: React.FC<ExportControlsProps> = ({
         includeFilters: values.includeFilters,
         includeModifications: values.includeModifications,
         title: values.title,
-        description: values.description
+        description: values.description,
       }
 
       console.log('ExportControls: Начинаем экспорт', {
         format: options.format,
         options,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       })
 
       setExportLoading(true)
@@ -86,9 +90,9 @@ const ExportControls: React.FC<ExportControlsProps> = ({
       }
 
       setIsModalVisible(false)
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка'
+      const errorMessage =
+        error instanceof Error ? error.message : 'Неизвестная ошибка'
       message.error(`Ошибка экспорта: ${errorMessage}`)
       console.error('ExportControls: Ошибка экспорта', error)
     } finally {
@@ -102,12 +106,12 @@ const ExportControls: React.FC<ExportControlsProps> = ({
       includeCalculations: true,
       includeFilters: false,
       includeModifications: false,
-      title: `Тендерная смета от ${new Date().toLocaleDateString('ru-RU')}`
+      title: `Тендерная смета от ${new Date().toLocaleDateString('ru-RU')}`,
     }
 
     console.log('ExportControls: Быстрый экспорт', {
       format,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     })
 
     if (format === 'excel') {
@@ -127,11 +131,11 @@ const ExportControls: React.FC<ExportControlsProps> = ({
       includeCalculations: false,
       includeFilters: false,
       includeModifications: false,
-      title: `smeta_${new Date().toISOString().split('T')[0]}`
+      title: `smeta_${new Date().toISOString().split('T')[0]}`,
     }
 
     console.log('ExportControls: Экспорт в CSV', {
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     })
 
     try {
@@ -218,11 +222,7 @@ const ExportControls: React.FC<ExportControlsProps> = ({
         okText="Экспортировать"
         cancelText="Отмена"
       >
-        <Form
-          form={form}
-          layout="vertical"
-          style={{ marginTop: 16 }}
-        >
+        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item
             name="format"
             label="Формат файла"
@@ -248,10 +248,7 @@ const ExportControls: React.FC<ExportControlsProps> = ({
             <Input placeholder="Введите название документа" />
           </Form.Item>
 
-          <Form.Item
-            name="description"
-            label="Описание"
-          >
+          <Form.Item name="description" label="Описание">
             <TextArea
               rows={3}
               placeholder="Дополнительное описание документа (опционально)"

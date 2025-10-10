@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import {
   Modal,
   Form,
@@ -46,6 +46,7 @@ interface MaterialData {
   consumptionRate?: number
   materialPrice?: number
   deliveryPrice?: number
+  materialId?: string // ID материала из справочника (если создан или выбран)
 }
 
 interface FormData {
@@ -72,7 +73,8 @@ export default function AddRateModal({
   const [selectedCatalogMaterial, setSelectedCatalogMaterial] = useState<
     string | null
   >(null)
-  const [editingCatalogMaterial, setEditingCatalogMaterial] = useState<MaterialData | null>(null)
+  const [editingCatalogMaterial, setEditingCatalogMaterial] =
+    useState<MaterialData | null>(null)
 
   // Загружаем материалы из справочника
   const { data: materials = [], isLoading: materialsLoading } = useQuery({
@@ -184,6 +186,7 @@ export default function AddRateModal({
         deliveryPrice: deliveryPrice,
         total: total,
         groupId: contractorId,
+        materialId: mat.materialId, // Добавляем реальный ID материала из справочника
       }
     })
 
@@ -222,6 +225,73 @@ export default function AddRateModal({
         consumptionRate: values.consumptionRate || 1,
         materialPrice: values.materialPrice || 0,
         deliveryPrice: values.deliveryPrice || 0,
+      }
+
+      // Проверяем, существует ли материал с таким названием в справочнике
+      let existingMaterial = materials.find(
+        m =>
+          m.name.toLowerCase().trim() === newMaterial.name.toLowerCase().trim()
+      )
+
+      if (!existingMaterial) {
+        // Материал не найден в справочнике - создаем его автоматически
+        try {
+          // Находим unit_id по короткому названию единицы измерения
+          const unit = units.find(
+            u =>
+              u.short_name === newMaterial.unit || u.name === newMaterial.unit
+          )
+
+          if (!unit) {
+            message.error(
+              `Не найдена единица измерения "${newMaterial.unit}" в справочнике`
+            )
+            return
+          }
+
+          // Генерируем код материала
+          const code = `MAT-${Date.now().toString().slice(-6)}`
+
+          // Создаем материал в базе данных
+          const createdMaterial = await materialsApi.create({
+            code,
+            name: newMaterial.name,
+            description: `Автоматически создан из расценки`,
+            category: 'other',
+            unit_id: unit.id,
+            last_purchase_price: newMaterial.materialPrice || 0,
+            is_active: true,
+          })
+
+          console.log('Auto-created material:', {
+            action: 'auto_create_material',
+            materialName: newMaterial.name,
+            materialId: createdMaterial.id,
+            timestamp: new Date().toISOString(),
+          })
+
+          // Сохраняем ID созданного материала
+          newMaterial.materialId = createdMaterial.id
+
+          message.info(
+            `Материал "${newMaterial.name}" автоматически добавлен в справочник материалов`,
+            3
+          )
+        } catch (error) {
+          console.error('Failed to auto-create material:', error)
+          message.warning(
+            `Не удалось автоматически добавить материал в справочник, но он будет использован в расценке`,
+            5
+          )
+        }
+      } else {
+        // Материал найден в справочнике - используем его ID
+        newMaterial.materialId = existingMaterial.id
+        console.log('Using existing material from catalog:', {
+          materialName: newMaterial.name,
+          materialId: existingMaterial.id,
+          timestamp: new Date().toISOString(),
+        })
       }
 
       setTempMaterials(prev => [...prev, newMaterial])
@@ -271,6 +341,7 @@ export default function AddRateModal({
       consumptionRate: 1,
       materialPrice: material.last_purchase_price || 0,
       deliveryPrice: 0,
+      materialId: material.id, // Сохраняем ID материала из справочника
     }
 
     // Заполняем форму данными материала для редактирования
@@ -288,7 +359,7 @@ export default function AddRateModal({
       // Добавляем отредактированный материал в список
       const newMaterial: MaterialData = {
         ...editingCatalogMaterial,
-        ...values
+        ...values,
       }
 
       setTempMaterials(prev => [...prev, newMaterial])
@@ -302,7 +373,9 @@ export default function AddRateModal({
         consumptionRate: 1,
       })
 
-      message.success(`Материал "${newMaterial.name}" добавлен с вашими параметрами`)
+      message.success(
+        `Материал "${newMaterial.name}" добавлен с вашими параметрами`
+      )
     } catch (error) {
       console.log('Validation error:', error)
       message.error('Заполните обязательные поля материала')
@@ -652,7 +725,9 @@ export default function AddRateModal({
                       </Button>
                     }
                   >
-                    <Text type="secondary">Настройте параметры материала из справочника:</Text>
+                    <Text type="secondary">
+                      Настройте параметры материала из справочника:
+                    </Text>
                     <br />
                     <Text strong>{editingCatalogMaterial.name}</Text>
                   </Card>
@@ -766,8 +841,12 @@ export default function AddRateModal({
 
                 {/* Кнопка добавления материала в список */}
                 <Button
-                  type={editingCatalogMaterial ? "primary" : "dashed"}
-                  onClick={editingCatalogMaterial ? handleAddEditedCatalogMaterial : handleAddMaterial}
+                  type={editingCatalogMaterial ? 'primary' : 'dashed'}
+                  onClick={
+                    editingCatalogMaterial
+                      ? handleAddEditedCatalogMaterial
+                      : handleAddMaterial
+                  }
                   icon={<PlusOutlined />}
                   style={{ width: '100%', marginBottom: '16px' }}
                 >
@@ -811,7 +890,7 @@ export default function AddRateModal({
               onClick={() => {
                 // Переходим сразу к сохранению, пропуская материалы
                 setCurrentStep(2)
-                setTimeout(() => handleSave(), 100)
+                window.setTimeout(() => handleSave(), 100)
               }}
             >
               Пропустить материалы

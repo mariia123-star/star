@@ -80,7 +80,10 @@ export const cacheUtils = {
     searchText: string,
     filters: Record<string, any> = {}
   ): string => {
-    const searchHash = btoa(searchText).replace(/[/+=]/g, '').substring(0, 8)
+    const searchHash = window
+      .btoa(searchText)
+      .replace(/[/+=]/g, '')
+      .substring(0, 8)
     return cacheUtils.generateKey(
       `${CACHE_KEYS.SEARCH_RESULTS}:${searchHash}`,
       filters

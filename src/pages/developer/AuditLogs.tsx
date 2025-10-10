@@ -63,25 +63,31 @@ function AuditLogs() {
   const [tableFilter, setTableFilter] = useState<string | undefined>()
 
   // Запрос логов с фильтрацией
-  const { data: logs = [], isLoading, refetch } = useQuery({
+  const {
+    data: logs = [],
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ['auditLogs', dateRange, actionFilter, tableFilter],
-    queryFn: () => auditLogApi.getAll({
-      action_type: actionFilter as string | undefined,
-      table_name: tableFilter,
-      date_from: dateRange?.[0]?.toISOString(),
-      date_to: dateRange?.[1]?.toISOString(),
-      limit: 1000,
-    }),
+    queryFn: () =>
+      auditLogApi.getAll({
+        action_type: actionFilter as string | undefined,
+        table_name: tableFilter,
+        date_from: dateRange?.[0]?.toISOString(),
+        date_to: dateRange?.[1]?.toISOString(),
+        limit: 1000,
+      }),
     refetchInterval: 30000, // Обновляем каждые 30 секунд
   })
 
   // Запрос статистики
   const { data: statistics } = useQuery({
     queryKey: ['auditStatistics', dateRange],
-    queryFn: () => auditLogApi.getStatistics(
-      dateRange?.[0]?.toISOString(),
-      dateRange?.[1]?.toISOString()
-    ),
+    queryFn: () =>
+      auditLogApi.getStatistics(
+        dateRange?.[0]?.toISOString(),
+        dateRange?.[1]?.toISOString()
+      ),
     refetchInterval: 60000, // Обновляем каждую минуту
   })
 
@@ -109,9 +115,7 @@ function AuditLogs() {
       render: (action: string) => (
         <Space>
           {actionIcons[action]}
-          <Tag color={actionColors[action]}>
-            {action.toUpperCase()}
-          </Tag>
+          <Tag color={actionColors[action]}>{action.toUpperCase()}</Tag>
         </Space>
       ),
       filters: [
@@ -123,16 +127,15 @@ function AuditLogs() {
         { text: 'Импорт', value: 'import' },
         { text: 'Навигация', value: 'navigate' },
       ],
-      onFilter: (value: string | number | boolean, record: AuditLogEntry) => record.action_type === value,
+      onFilter: (value: string | number | boolean, record: AuditLogEntry) =>
+        record.action_type === value,
     },
     {
       title: 'Таблица/Раздел',
       dataIndex: 'table_name',
       key: 'table_name',
       width: 150,
-      render: (tableName: string) => (
-        <Tag color="geekblue">{tableName}</Tag>
-      ),
+      render: (tableName: string) => <Tag color="geekblue">{tableName}</Tag>,
       filters: [
         { text: 'Расценки', value: 'rates' },
         { text: 'Материалы', value: 'materials' },
@@ -141,7 +144,8 @@ function AuditLogs() {
         { text: 'Пользовательские действия', value: 'user_interaction' },
         { text: 'Навигация', value: 'navigation' },
       ],
-      onFilter: (value: string | number | boolean, record: AuditLogEntry) => record.table_name === value,
+      onFilter: (value: string | number | boolean, record: AuditLogEntry) =>
+        record.table_name === value,
     },
     {
       title: 'Описание',
@@ -155,18 +159,20 @@ function AuditLogs() {
       dataIndex: 'record_id',
       key: 'record_id',
       width: 120,
-      render: (id: string) => id ? (
-        <Tag color="default">{id.substring(0, 8)}...</Tag>
-      ) : '—',
+      render: (id: string) =>
+        id ? <Tag color="default">{id.substring(0, 8)}...</Tag> : '—',
     },
     {
       title: 'Сессия',
       dataIndex: 'session_id',
       key: 'session_id',
       width: 120,
-      render: (sessionId: string) => sessionId ? (
-        <Tag color="processing">{sessionId.substring(0, 8)}...</Tag>
-      ) : '—',
+      render: (sessionId: string) =>
+        sessionId ? (
+          <Tag color="processing">{sessionId.substring(0, 8)}...</Tag>
+        ) : (
+          '—'
+        ),
     },
     {
       title: 'Страница',
@@ -267,9 +273,13 @@ function AuditLogs() {
             >
               <Select.Option value="rates">Расценки</Select.Option>
               <Select.Option value="materials">Материалы</Select.Option>
-              <Select.Option value="tender_estimates">Тендерные сметы</Select.Option>
+              <Select.Option value="tender_estimates">
+                Тендерные сметы
+              </Select.Option>
               <Select.Option value="units">Единицы измерения</Select.Option>
-              <Select.Option value="user_interaction">Действия пользователя</Select.Option>
+              <Select.Option value="user_interaction">
+                Действия пользователя
+              </Select.Option>
               <Select.Option value="navigation">Навигация</Select.Option>
             </Select>
           </Col>
@@ -282,10 +292,7 @@ function AuditLogs() {
               >
                 Обновить
               </Button>
-              <Button
-                icon={<DownloadOutlined />}
-                onClick={handleExportLogs}
-              >
+              <Button icon={<DownloadOutlined />} onClick={handleExportLogs}>
                 Экспортировать
               </Button>
             </Space>

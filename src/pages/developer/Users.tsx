@@ -296,15 +296,17 @@ function Users() {
           }
         `}
       </style>
-      <div style={{ 
-        flexShrink: 0, 
-        marginBottom: 24,
-        background: '#ffffff',
-        borderRadius: 16,
-        padding: 24,
-        boxShadow: '0 2px 12px rgba(0, 0, 0, 0.06)',
-        border: '1px solid #f0f2f5'
-      }}>
+      <div
+        style={{
+          flexShrink: 0,
+          marginBottom: 24,
+          background: '#ffffff',
+          borderRadius: 16,
+          padding: 24,
+          boxShadow: '0 2px 12px rgba(0, 0, 0, 0.06)',
+          border: '1px solid #f0f2f5',
+        }}
+      >
         <div
           style={{
             display: 'flex',
@@ -313,20 +315,30 @@ function Users() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{
-              width: 48,
-              height: 48,
-              borderRadius: 12,
-              background: 'linear-gradient(135deg, #ec4899, #be185d)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(236, 72, 153, 0.3)'
-            }}>
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 12,
+                background: 'linear-gradient(135deg, #ec4899, #be185d)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(236, 72, 153, 0.3)',
+              }}
+            >
               <UserOutlined style={{ color: '#fff', fontSize: 20 }} />
             </div>
             <div>
-              <Title level={2} style={{ margin: 0, color: '#1a1a1a', fontSize: 28, fontWeight: 700 }}>
+              <Title
+                level={2}
+                style={{
+                  margin: 0,
+                  color: '#1a1a1a',
+                  fontSize: 28,
+                  fontWeight: 700,
+                }}
+              >
                 Пользователи
               </Title>
               <div style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>
@@ -334,10 +346,10 @@ function Users() {
               </div>
             </div>
           </div>
-          <Button 
-            type="primary" 
+          <Button
+            type="primary"
             size="large"
-            icon={<PlusOutlined />} 
+            icon={<PlusOutlined />}
             onClick={handleAdd}
             style={{
               background: 'linear-gradient(135deg, #ec4899, #be185d)',
@@ -353,15 +365,17 @@ function Users() {
         </div>
       </div>
 
-      <div style={{ 
-        flex: 1, 
-        overflow: 'hidden',
-        background: '#ffffff',
-        borderRadius: 16,
-        padding: 24,
-        boxShadow: '0 2px 12px rgba(0, 0, 0, 0.06)',
-        border: '1px solid #f0f2f5'
-      }}>
+      <div
+        style={{
+          flex: 1,
+          overflow: 'hidden',
+          background: '#ffffff',
+          borderRadius: 16,
+          padding: 24,
+          boxShadow: '0 2px 12px rgba(0, 0, 0, 0.06)',
+          border: '1px solid #f0f2f5',
+        }}
+      >
         <Table
           columns={columns}
           dataSource={users}

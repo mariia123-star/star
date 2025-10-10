@@ -1,6 +1,7 @@
 # Инструкция по применению таблицы estimate_drafts
 
 ## Описание
+
 Таблица `estimate_drafts` предназначена для хранения черновиков смет в системе STAR. Она позволяет сохранять промежуточные версии смет перед их финальным утверждением.
 
 ## Способы применения схемы
@@ -32,11 +33,13 @@
 ### Способ 2: Через Supabase CLI
 
 1. **Установите Supabase CLI** (если еще не установлен)
+
    ```bash
    npm install -g supabase
    ```
 
 2. **Подключитесь к проекту**
+
    ```bash
    supabase login
    supabase link --project-ref ваш-project-ref
@@ -77,6 +80,7 @@
 После применения схемы выполните следующие проверки:
 
 1. **Проверка наличия таблицы**
+
    ```sql
    SELECT table_name
    FROM information_schema.tables
@@ -85,6 +89,7 @@
    ```
 
 2. **Проверка структуры таблицы**
+
    ```sql
    SELECT column_name, data_type, is_nullable
    FROM information_schema.columns
@@ -93,6 +98,7 @@
    ```
 
 3. **Проверка индексов**
+
    ```sql
    SELECT indexname, indexdef
    FROM pg_indexes
@@ -109,6 +115,7 @@
 ## Тестирование функционала
 
 1. **Создайте тестовый черновик**
+
    ```sql
    INSERT INTO estimate_drafts (project_id, name, data, total_amount)
    VALUES (
@@ -121,6 +128,7 @@
    ```
 
 2. **Проверьте автообновление updated_at**
+
    ```sql
    UPDATE estimate_drafts
    SET name = 'Обновленный черновик'
@@ -140,6 +148,7 @@
 ## Возможные проблемы и решения
 
 ### Ошибка: таблица уже существует
+
 ```sql
 -- Удалите существующую таблицу (ВНИМАНИЕ: удалит все данные!)
 DROP TABLE IF EXISTS estimate_drafts CASCADE;
@@ -147,6 +156,7 @@ DROP TABLE IF EXISTS estimate_drafts CASCADE;
 ```
 
 ### Ошибка: функция gen_random_uuid() не найдена
+
 ```sql
 -- Включите расширение uuid-ossp
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -155,6 +165,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 ```
 
 ### Ошибка: таблица projects не найдена
+
 ```sql
 -- Убедитесь, что основная схема БД применена
 -- Выполните файл supabase/prod.sql перед estimate_drafts.sql
@@ -178,6 +189,7 @@ DROP TABLE IF EXISTS estimate_drafts CASCADE;
 ## Контакты для поддержки
 
 При возникновении проблем обратитесь:
+
 - К администратору базы данных
 - В техническую поддержку Supabase
 - К разработчикам проекта STAR

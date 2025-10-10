@@ -3,6 +3,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   usersApi,
   User,
+  UpdateUserData,
+  CreateUserData,
 } from '../shared/api/users'
 
 interface UserModalProps {

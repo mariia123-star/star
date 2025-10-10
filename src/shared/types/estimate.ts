@@ -121,43 +121,49 @@ export const ESTIMATE_COLORS = {
   contractor: {
     background: '#eff6ff',
     border: '#bfdbfe',
-    text: '#1e40af'
+    text: '#1e40af',
   },
   work: {
     background: '#f0fdf4',
     border: '#bbf7d0',
-    text: '#15803d'
+    text: '#15803d',
   },
   material: {
     background: '#fffbeb',
     border: '#fed7aa',
-    text: '#ea580c'
+    text: '#ea580c',
   },
   edited: {
     background: '#fef3c7',
     border: '#fcd34d',
-    text: '#92400e'
+    text: '#92400e',
   },
   selected: {
     background: '#e0e7ff',
     border: '#c7d2fe',
-    text: '#3730a3'
-  }
+    text: '#3730a3',
+  },
 } as const
 
 export const DEFAULT_VAT_RATE = 20
 
 export const UNITS = [
-  'м³', 'м²', 'м', 'кг', 'т', 'шт', 'компл', 'л', 'км', 'час', 'смена'
+  'м³',
+  'м²',
+  'м',
+  'кг',
+  'т',
+  'шт',
+  'компл',
+  'л',
+  'км',
+  'час',
+  'смена',
 ] as const
 
-export const JUSTIFICATION_TYPES = [
-  'подрядчик', 'раб', 'мат'
-] as const
+export const JUSTIFICATION_TYPES = ['подрядчик', 'раб', 'мат'] as const
 
-export const MATERIAL_TYPES = [
-  'основа', 'вспом'
-] as const
+export const MATERIAL_TYPES = ['основа', 'вспом'] as const
 
 // Новые типы для консоли расценок
 export interface RatePosition extends Record<string, unknown> {
@@ -187,22 +193,22 @@ export interface RateGroup {
 export const RATE_COLORS = {
   contractor: {
     background: '#4472C4',
-    text: '#FFFFFF'
+    text: '#FFFFFF',
   },
   work: {
     background: '#70AD47',
-    text: '#FFFFFF'
+    text: '#FFFFFF',
   },
   materialMain: {
     background: '#FFC000',
     text: '#000000',
-    border: '#CC9900'
+    border: '#CC9900',
   },
   materialAux: {
     background: '#FFE699',
     text: '#000000',
-    border: '#B8860B'
-  }
+    border: '#B8860B',
+  },
 } as const
 
 // Дополнительные типы для поддержки виджетов
@@ -272,6 +278,7 @@ export interface EstimateContextType {
   filters: EstimateFilters
   modifications: EstimateModification[]
   selectedIds: string[]
+  selectedProjectId: string | null
   isLoading: boolean
   error: string | null
 
@@ -279,6 +286,7 @@ export interface EstimateContextType {
   setItems: (items: EstimateItem[]) => void
   setFilters: (filters: EstimateFilters) => void
   setSelectedIds: (ids: string[]) => void
+  setSelectedProject: (projectId: string | null) => void
   addItem: (item: Omit<EstimateItem, 'id'>) => void
   updateItem: (id: string, updates: Partial<EstimateItem>) => void
   deleteItem: (id: string) => void
@@ -321,4 +329,3 @@ export interface EstimateModification {
   timestamp: string
   userId?: string
 }
-

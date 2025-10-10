@@ -12,7 +12,8 @@ import {
   Tooltip,
   Alert,
   Timeline,
-  Tag
+  Tag,
+  Select,
 } from 'antd'
 import {
   CalculatorOutlined,
@@ -20,9 +21,12 @@ import {
   UndoOutlined,
   HistoryOutlined,
   ArrowUpOutlined,
-  ArrowDownOutlined
+  ArrowDownOutlined,
+  ProjectOutlined,
 } from '@ant-design/icons'
 import { EstimateItem, EstimateModification } from '@/shared/types/estimate'
+import { useQuery } from '@tanstack/react-query'
+import { projectsApi } from '@/entities/projects'
 
 const { Title, Text } = Typography
 
@@ -30,8 +34,13 @@ interface CalculatorProps {
   items: EstimateItem[]
   modifications: EstimateModification[]
   onApplyVolumeChange: (percentage: number) => void
-  onApplyPriceChange: (field: 'workPrice' | 'materialPriceWithVAT' | 'deliveryPrice', percentage: number) => void
+  onApplyPriceChange: (
+    field: 'workPrice' | 'materialPriceWithVAT' | 'deliveryPrice',
+    percentage: number
+  ) => void
   onUndoModification: (modificationId: string) => void
+  onProjectChange?: (projectId: string | null) => void
+  selectedProjectId?: string | null
   loading?: boolean
 }
 
@@ -41,17 +50,26 @@ const Calculator: React.FC<CalculatorProps> = ({
   onApplyVolumeChange,
   onApplyPriceChange,
   onUndoModification,
-  loading = false
+  onProjectChange,
+  selectedProjectId,
+  loading = false,
 }) => {
   const [volumePercentage, setVolumePercentage] = useState<number>(0)
   const [pricePercentage, setPricePercentage] = useState<number>(0)
-  const [selectedPriceField, setSelectedPriceField] = useState<'workPrice' | 'materialPriceWithVAT' | 'deliveryPrice'>('workPrice')
+  const [selectedPriceField, setSelectedPriceField] = useState<
+    'workPrice' | 'materialPriceWithVAT' | 'deliveryPrice'
+  >('workPrice')
+
+  const { data: projects = [], isLoading: projectsLoading } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => projectsApi.getAll(),
+  })
 
   const handleVolumeChange = () => {
     if (volumePercentage !== 0) {
       console.log('Calculator: Применяем изменение объема', {
         percentage: volumePercentage,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       })
 
       onApplyVolumeChange(volumePercentage)
@@ -64,7 +82,7 @@ const Calculator: React.FC<CalculatorProps> = ({
       console.log('Calculator: Применяем изменение цены', {
         field: selectedPriceField,
         percentage: pricePercentage,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       })
 
       onApplyPriceChange(selectedPriceField, pricePercentage)
@@ -91,10 +109,12 @@ const Calculator: React.FC<CalculatorProps> = ({
   // }
 
   const formatCurrency = (value: number) => {
-    return value.toLocaleString('ru-RU', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }) + ' ₽'
+    return (
+      value.toLocaleString('ru-RU', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }) + ' ₽'
+    )
   }
 
   const calculatePotentialImpact = (percentage: number, field?: string) => {
@@ -119,15 +139,79 @@ const Calculator: React.FC<CalculatorProps> = ({
     return { totalImpact, affectedItems }
   }
 
-  const volumeImpact = volumePercentage !== 0 ? calculatePotentialImpact(volumePercentage, 'volume') : null
-  const priceImpact = pricePercentage !== 0 ? calculatePotentialImpact(pricePercentage, selectedPriceField) : null
+  const volumeImpact =
+    volumePercentage !== 0
+      ? calculatePotentialImpact(volumePercentage, 'volume')
+      : null
+  const priceImpact =
+    pricePercentage !== 0
+      ? calculatePotentialImpact(pricePercentage, selectedPriceField)
+      : null
 
   const recentModifications = modifications
     .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
     .slice(0, 10)
 
+  const handleProjectChange = (value: string | null) => {
+    console.log('Calculator: Выбран проект', {
+      projectId: value,
+      timestamp: new Date().toISOString(),
+    })
+
+    if (onProjectChange) {
+      onProjectChange(value)
+    }
+  }
+
   return (
     <Row gutter={[16, 16]}>
+      <Col xs={24}>
+        <Card
+          title={
+            <Space>
+              <ProjectOutlined />
+              <span>Привязка к проекту</span>
+            </Space>
+          }
+          size="small"
+        >
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <Text type="secondary">
+              Выберите проект для привязки сметы. Смета будет сохранена с
+              указанным проектом.
+            </Text>
+            <Select
+              placeholder="Выберите проект"
+              value={selectedProjectId}
+              onChange={handleProjectChange}
+              allowClear
+              showSearch
+              loading={projectsLoading}
+              style={{ width: '100%' }}
+              filterOption={(input, option) => {
+                const text = option?.children?.toString() || ''
+                return text.toLowerCase().includes(input.toLowerCase())
+              }}
+            >
+              {projects.map(project => (
+                <Select.Option key={project.id} value={project.id}>
+                  {project.name}
+                </Select.Option>
+              ))}
+            </Select>
+            {selectedProjectId && (
+              <Alert
+                type="info"
+                message={`Смета привязана к проекту: ${
+                  projects.find(p => p.id === selectedProjectId)?.name || ''
+                }`}
+                showIcon
+              />
+            )}
+          </Space>
+        </Card>
+      </Col>
+
       <Col xs={24} lg={12}>
         <Card
           title={
@@ -150,12 +234,12 @@ const Calculator: React.FC<CalculatorProps> = ({
                 <Col flex="auto">
                   <InputNumber
                     value={volumePercentage}
-                    onChange={(value) => setVolumePercentage(value || 0)}
+                    onChange={value => setVolumePercentage(value || 0)}
                     style={{ width: '100%' }}
                     step={0.1}
                     precision={1}
-                    formatter={(value) => `${value}%`}
-                    parser={(value) => value!.replace('%', '')}
+                    formatter={value => `${value}%`}
+                    parser={value => value!.replace('%', '')}
                     placeholder="Изменение в %"
                   />
                 </Col>
@@ -177,9 +261,14 @@ const Calculator: React.FC<CalculatorProps> = ({
                   showIcon
                   message={
                     <Space>
-                      {volumeImpact.totalImpact > 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
+                      {volumeImpact.totalImpact > 0 ? (
+                        <ArrowUpOutlined />
+                      ) : (
+                        <ArrowDownOutlined />
+                      )}
                       <Text>
-                        Изменение: {formatCurrency(Math.abs(volumeImpact.totalImpact))}
+                        Изменение:{' '}
+                        {formatCurrency(Math.abs(volumeImpact.totalImpact))}
                       </Text>
                       <Text type="secondary">
                         ({volumeImpact.affectedItems} позиций)
@@ -204,11 +293,13 @@ const Calculator: React.FC<CalculatorProps> = ({
             <Space direction="vertical" style={{ width: '100%' }}>
               <Radio.Group
                 value={selectedPriceField}
-                onChange={(e) => setSelectedPriceField(e.target.value)}
+                onChange={e => setSelectedPriceField(e.target.value)}
                 style={{ width: '100%' }}
               >
                 <Radio.Button value="workPrice">Работы</Radio.Button>
-                <Radio.Button value="materialPriceWithVAT">Материалы</Radio.Button>
+                <Radio.Button value="materialPriceWithVAT">
+                  Материалы
+                </Radio.Button>
                 <Radio.Button value="deliveryPrice">Доставка</Radio.Button>
               </Radio.Group>
 
@@ -216,12 +307,12 @@ const Calculator: React.FC<CalculatorProps> = ({
                 <Col flex="auto">
                   <InputNumber
                     value={pricePercentage}
-                    onChange={(value) => setPricePercentage(value || 0)}
+                    onChange={value => setPricePercentage(value || 0)}
                     style={{ width: '100%' }}
                     step={0.1}
                     precision={1}
-                    formatter={(value) => `${value}%`}
-                    parser={(value) => value!.replace('%', '')}
+                    formatter={value => `${value}%`}
+                    parser={value => value!.replace('%', '')}
                     placeholder="Изменение в %"
                   />
                 </Col>
@@ -243,9 +334,14 @@ const Calculator: React.FC<CalculatorProps> = ({
                   showIcon
                   message={
                     <Space>
-                      {priceImpact.totalImpact > 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
+                      {priceImpact.totalImpact > 0 ? (
+                        <ArrowUpOutlined />
+                      ) : (
+                        <ArrowDownOutlined />
+                      )}
                       <Text>
-                        Изменение: {formatCurrency(Math.abs(priceImpact.totalImpact))}
+                        Изменение:{' '}
+                        {formatCurrency(Math.abs(priceImpact.totalImpact))}
                       </Text>
                       <Text type="secondary">
                         ({priceImpact.affectedItems} позиций)
@@ -267,7 +363,10 @@ const Calculator: React.FC<CalculatorProps> = ({
               <Tooltip title="Увеличить объемы на 10%">
                 <Button
                   size="small"
-                  onClick={() => { setVolumePercentage(10); globalThis.setTimeout(handleVolumeChange, 100) }}
+                  onClick={() => {
+                    setVolumePercentage(10)
+                    globalThis.setTimeout(handleVolumeChange, 100)
+                  }}
                   disabled={loading}
                 >
                   +10% объем
@@ -276,7 +375,10 @@ const Calculator: React.FC<CalculatorProps> = ({
               <Tooltip title="Уменьшить объемы на 10%">
                 <Button
                   size="small"
-                  onClick={() => { setVolumePercentage(-10); globalThis.setTimeout(handleVolumeChange, 100) }}
+                  onClick={() => {
+                    setVolumePercentage(-10)
+                    globalThis.setTimeout(handleVolumeChange, 100)
+                  }}
                   disabled={loading}
                 >
                   -10% объем
@@ -331,10 +433,16 @@ const Calculator: React.FC<CalculatorProps> = ({
               items={recentModifications.map(mod => ({
                 children: (
                   <div>
-                    <Space direction="vertical" size={0} style={{ width: '100%' }}>
+                    <Space
+                      direction="vertical"
+                      size={0}
+                      style={{ width: '100%' }}
+                    >
                       <Space>
                         <Text strong>{mod.description}</Text>
-                        <Tag size="small">{getFieldLabel(mod.field as string)}</Tag>
+                        <Tag size="small">
+                          {getFieldLabel(mod.field as string)}
+                        </Tag>
                       </Space>
                       <Text type="secondary" style={{ fontSize: '12px' }}>
                         {mod.timestamp.toLocaleString('ru-RU')}
@@ -343,15 +451,13 @@ const Calculator: React.FC<CalculatorProps> = ({
                         <Text type="secondary">
                           {typeof mod.oldValue === 'number'
                             ? formatCurrency(mod.oldValue)
-                            : String(mod.oldValue)
-                          }
+                            : String(mod.oldValue)}
                         </Text>
                         <span>→</span>
                         <Text>
                           {typeof mod.newValue === 'number'
                             ? formatCurrency(mod.newValue)
-                            : String(mod.newValue)
-                          }
+                            : String(mod.newValue)}
                         </Text>
                         <Button
                           type="text"
@@ -364,7 +470,7 @@ const Calculator: React.FC<CalculatorProps> = ({
                     </Space>
                   </div>
                 ),
-                color: 'blue'
+                color: 'blue',
               }))}
             />
           )}

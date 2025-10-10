@@ -25,10 +25,10 @@ function DatabaseDebug() {
   const runDiagnostics = async () => {
     setLoading(true)
     setError(null)
-    
+
     try {
       const diagnostics: any = {
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       }
 
       console.log('🔍 Запуск диагностики базы данных...')
@@ -78,15 +78,25 @@ function DatabaseDebug() {
           console.log('Группировка по record_type:', groupedByType)
 
           // Анализ заполненности новых полей
-          const fieldAnalysis: Record<string, { filled: number, empty: number }> = {}
-          const newFields = ['record_type', 'material_type', 'coefficient', 'work_price', 'material_price', 'delivery_cost']
-          
+          const fieldAnalysis: Record<
+            string,
+            { filled: number; empty: number }
+          > = {}
+          const newFields = [
+            'record_type',
+            'material_type',
+            'coefficient',
+            'work_price',
+            'material_price',
+            'delivery_cost',
+          ]
+
           newFields.forEach(field => {
             fieldAnalysis[field] = {
               filled: 0,
-              empty: 0
+              empty: 0,
             }
-            
+
             allRecords.forEach(record => {
               const value = (record as any)[field]
               if (value !== null && value !== undefined && value !== '') {
@@ -96,7 +106,7 @@ function DatabaseDebug() {
               }
             })
           })
-          
+
           diagnostics.fieldAnalysis = fieldAnalysis
           console.log('Анализ заполненности полей:', fieldAnalysis)
 
@@ -111,7 +121,7 @@ function DatabaseDebug() {
             work_price: record.work_price || null,
             material_price: record.material_price || null,
             delivery_cost: record.delivery_cost || null,
-            created_at: record.created_at
+            created_at: record.created_at,
           }))
         }
       }
@@ -126,7 +136,10 @@ function DatabaseDebug() {
           .eq('table_schema', 'public')
 
         if (columnsError) {
-          console.log('Ошибка получения схемы через information_schema:', columnsError)
+          console.log(
+            'Ошибка получения схемы через information_schema:',
+            columnsError
+          )
           diagnostics.schemaError = columnsError.message
         } else {
           diagnostics.tableSchema = columnsData
@@ -139,7 +152,6 @@ function DatabaseDebug() {
 
       setResults(diagnostics)
       console.log('✅ Диагностика завершена:', diagnostics)
-
     } catch (err) {
       console.error('❌ Ошибка при выполнении диагностики:', err)
       setError(err instanceof Error ? err.message : 'Неизвестная ошибка')
@@ -154,70 +166,74 @@ function DatabaseDebug() {
       dataIndex: 'id',
       key: 'id',
       width: 100,
-      render: (text: string) => text.slice(-8)
+      render: (text: string) => text.slice(-8),
     },
     {
       title: 'Материалы',
       dataIndex: 'materials',
       key: 'materials',
       width: 150,
-      render: (text: string) => text || '—'
+      render: (text: string) => text || '—',
     },
     {
       title: 'Работы',
       dataIndex: 'works',
       key: 'works',
       width: 150,
-      render: (text: string) => text || '—'
+      render: (text: string) => text || '—',
     },
     {
       title: 'Тип записи',
       dataIndex: 'record_type',
       key: 'record_type',
       width: 100,
-      render: (text: string) => text ? <Tag color="blue">{text}</Tag> : <Tag>NULL</Tag>
+      render: (text: string) =>
+        text ? <Tag color="blue">{text}</Tag> : <Tag>NULL</Tag>,
     },
     {
       title: 'Тип материала',
       dataIndex: 'material_type',
       key: 'material_type',
       width: 120,
-      render: (text: string) => text || '—'
+      render: (text: string) => text || '—',
     },
     {
       title: 'Коэффициент',
       dataIndex: 'coefficient',
       key: 'coefficient',
       width: 100,
-      render: (num: number) => num !== null && num !== undefined ? num.toString() : '—'
+      render: (num: number) =>
+        num !== null && num !== undefined ? num.toString() : '—',
     },
     {
       title: 'Цена работы',
       dataIndex: 'work_price',
       key: 'work_price',
       width: 100,
-      render: (num: number) => num !== null && num !== undefined ? `${num}₽` : '—'
+      render: (num: number) =>
+        num !== null && num !== undefined ? `${num}₽` : '—',
     },
     {
       title: 'Создано',
       dataIndex: 'created_at',
       key: 'created_at',
       width: 150,
-      render: (text: string) => new Date(text).toLocaleString('ru-RU')
-    }
+      render: (text: string) => new Date(text).toLocaleString('ru-RU'),
+    },
   ]
 
   return (
     <div style={{ padding: 24 }}>
       <Title level={2}>Диагностика базы данных tender_estimates</Title>
       <Paragraph>
-        Эта страница позволяет проанализировать структуру и содержимое таблицы tender_estimates
-        для выявления проблем с полями record_type и другими новыми полями.
+        Эта страница позволяет проанализировать структуру и содержимое таблицы
+        tender_estimates для выявления проблем с полями record_type и другими
+        новыми полями.
       </Paragraph>
 
       <Space style={{ marginBottom: 24 }}>
-        <Button 
-          type="primary" 
+        <Button
+          type="primary"
           onClick={runDiagnostics}
           loading={loading}
           size="large"
@@ -241,19 +257,30 @@ function DatabaseDebug() {
           {/* Общая статистика */}
           <Card title="Общая статистика" size="small">
             <div>
-              <Text strong>Время диагностики:</Text> {new Date(results.timestamp).toLocaleString('ru-RU')}
+              <Text strong>Время диагностики:</Text>{' '}
+              {new Date(results.timestamp).toLocaleString('ru-RU')}
             </div>
             <div>
-              <Text strong>Общее количество записей:</Text> {results.totalCount ?? 'Ошибка подсчета'}
+              <Text strong>Общее количество записей:</Text>{' '}
+              {results.totalCount ?? 'Ошибка подсчета'}
             </div>
             <div>
-              <Text strong>Записей получено для анализа:</Text> {results.recordsCount ?? 0}
+              <Text strong>Записей получено для анализа:</Text>{' '}
+              {results.recordsCount ?? 0}
             </div>
             {results.totalCountError && (
-              <Alert message={`Ошибка подсчета: ${results.totalCountError}`} type="warning" size="small" />
+              <Alert
+                message={`Ошибка подсчета: ${results.totalCountError}`}
+                type="warning"
+                size="small"
+              />
             )}
             {results.recordsError && (
-              <Alert message={`Ошибка получения записей: ${results.recordsError}`} type="error" size="small" />
+              <Alert
+                message={`Ошибка получения записей: ${results.recordsError}`}
+                type="error"
+                size="small"
+              />
             )}
           </Card>
 
@@ -262,10 +289,21 @@ function DatabaseDebug() {
             <Card title="Доступные поля в таблице" size="small">
               <Space wrap>
                 {results.availableFields.map((field: string) => (
-                  <Tag key={field} color={
-                    ['record_type', 'material_type', 'coefficient', 'work_price', 'material_price', 'delivery_cost'].includes(field) 
-                      ? 'green' : 'default'
-                  }>
+                  <Tag
+                    key={field}
+                    color={
+                      [
+                        'record_type',
+                        'material_type',
+                        'coefficient',
+                        'work_price',
+                        'material_price',
+                        'delivery_cost',
+                      ].includes(field)
+                        ? 'green'
+                        : 'default'
+                    }
+                  >
                     {field}
                   </Tag>
                 ))}
@@ -282,10 +320,26 @@ function DatabaseDebug() {
                 rowKey="column_name"
                 pagination={false}
                 columns={[
-                  { title: 'Поле', dataIndex: 'column_name', key: 'column_name' },
-                  { title: 'Тип данных', dataIndex: 'data_type', key: 'data_type' },
-                  { title: 'Nullable', dataIndex: 'is_nullable', key: 'is_nullable' },
-                  { title: 'По умолчанию', dataIndex: 'column_default', key: 'column_default' }
+                  {
+                    title: 'Поле',
+                    dataIndex: 'column_name',
+                    key: 'column_name',
+                  },
+                  {
+                    title: 'Тип данных',
+                    dataIndex: 'data_type',
+                    key: 'data_type',
+                  },
+                  {
+                    title: 'Nullable',
+                    dataIndex: 'is_nullable',
+                    key: 'is_nullable',
+                  },
+                  {
+                    title: 'По умолчанию',
+                    dataIndex: 'column_default',
+                    key: 'column_default',
+                  },
                 ]}
               />
             </Card>
@@ -295,16 +349,21 @@ function DatabaseDebug() {
           {results.groupedByRecordType && (
             <Card title="Группировка по типу записи (record_type)" size="small">
               <Space wrap>
-                {Object.entries(results.groupedByRecordType).map(([type, count]) => (
-                  <div key={type} style={{ 
-                    padding: '8px 12px', 
-                    border: '1px solid #d9d9d9', 
-                    borderRadius: 4,
-                    background: type === 'NULL' ? '#fff2f0' : '#f6ffed'
-                  }}>
-                    <Text strong>{type}:</Text> {count as number}
-                  </div>
-                ))}
+                {Object.entries(results.groupedByRecordType).map(
+                  ([type, count]) => (
+                    <div
+                      key={type}
+                      style={{
+                        padding: '8px 12px',
+                        border: '1px solid #d9d9d9',
+                        borderRadius: 4,
+                        background: type === 'NULL' ? '#fff2f0' : '#f6ffed',
+                      }}
+                    >
+                      <Text strong>{type}:</Text> {count as number}
+                    </div>
+                  )
+                )}
               </Space>
             </Card>
           )}
@@ -313,13 +372,19 @@ function DatabaseDebug() {
           {results.fieldAnalysis && (
             <Card title="Анализ заполненности новых полей" size="small">
               <Table
-                dataSource={Object.entries(results.fieldAnalysis).map(([field, stats]) => ({
-                  field,
-                  filled: (stats as any).filled,
-                  empty: (stats as any).empty,
-                  total: (stats as any).filled + (stats as any).empty,
-                  fillRate: ((stats as any).filled / ((stats as any).filled + (stats as any).empty) * 100).toFixed(1)
-                }))}
+                dataSource={Object.entries(results.fieldAnalysis).map(
+                  ([field, stats]) => ({
+                    field,
+                    filled: (stats as any).filled,
+                    empty: (stats as any).empty,
+                    total: (stats as any).filled + (stats as any).empty,
+                    fillRate: (
+                      ((stats as any).filled /
+                        ((stats as any).filled + (stats as any).empty)) *
+                      100
+                    ).toFixed(1),
+                  })
+                )}
                 size="small"
                 rowKey="field"
                 pagination={false}
@@ -328,16 +393,16 @@ function DatabaseDebug() {
                   { title: 'Заполнено', dataIndex: 'filled', key: 'filled' },
                   { title: 'Пусто', dataIndex: 'empty', key: 'empty' },
                   { title: 'Всего', dataIndex: 'total', key: 'total' },
-                  { 
-                    title: 'Заполненность, %', 
-                    dataIndex: 'fillRate', 
+                  {
+                    title: 'Заполненность, %',
+                    dataIndex: 'fillRate',
                     key: 'fillRate',
                     render: (rate: string) => (
                       <Tag color={parseFloat(rate) > 0 ? 'green' : 'red'}>
                         {rate}%
                       </Tag>
-                    )
-                  }
+                    ),
+                  },
                 ]}
               />
             </Card>

@@ -1,6 +1,11 @@
 import { Tabs, Card, Typography, Button, Space, Table, Tag } from 'antd'
-import { FileTextOutlined, PlusOutlined, EditOutlined, DeleteOutlined, CalculatorOutlined } from '@ant-design/icons'
-import TenderEstimate from './TenderEstimate'
+import {
+  FileTextOutlined,
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  CalculatorOutlined,
+} from '@ant-design/icons'
 import EstimatePortal from './EstimatePortal'
 
 const { TabPane } = Tabs
@@ -15,7 +20,7 @@ function Documents() {
       project: 'ЖК Московский',
       status: 'Активна',
       created: '2025-01-15',
-      total: '125 000 ₽'
+      total: '125 000 ₽',
     },
     {
       key: '2',
@@ -24,7 +29,7 @@ function Documents() {
       project: 'ТЦ Галерея',
       status: 'Черновик',
       created: '2025-01-14',
-      total: '2 450 000 ₽'
+      total: '2 450 000 ₽',
     },
     {
       key: '3',
@@ -33,8 +38,8 @@ function Documents() {
       project: 'Офис Центр',
       status: 'Завершена',
       created: '2025-01-10',
-      total: '850 000 ₽'
-    }
+      total: '850 000 ₽',
+    },
   ]
 
   const columns = [
@@ -65,7 +70,12 @@ function Documents() {
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => {
-        const color = status === 'Активна' ? 'green' : status === 'Черновик' ? 'orange' : 'blue'
+        const color =
+          status === 'Активна'
+            ? 'green'
+            : status === 'Черновик'
+              ? 'orange'
+              : 'blue'
         return <Tag color={color}>{status}</Tag>
       },
       filters: [
@@ -101,8 +111,17 @@ function Documents() {
 
   const DocumentsList = () => (
     <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Title level={4} style={{ margin: 0 }}>Список документов</Title>
+      <div
+        style={{
+          marginBottom: 16,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <Title level={4} style={{ margin: 0 }}>
+          Список документов
+        </Title>
         <Button type="primary" icon={<PlusOutlined />}>
           Создать документ
         </Button>
@@ -116,7 +135,8 @@ function Documents() {
             total: testDocuments.length,
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (total, range) => `${range[0]}-${range[1]} из ${total} документов`,
+            showTotal: (total, range) =>
+              `${range[0]}-${range[1]} из ${total} документов`,
           }}
           size="small"
         />
@@ -137,17 +157,6 @@ function Documents() {
           key="documents-list"
         >
           <DocumentsList />
-        </TabPane>
-        <TabPane
-          tab={
-            <span>
-              <FileTextOutlined />
-              Тендерная смета
-            </span>
-          }
-          key="tender-estimate"
-        >
-          <TenderEstimate />
         </TabPane>
         <TabPane
           tab={

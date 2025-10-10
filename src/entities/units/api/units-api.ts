@@ -2,12 +2,60 @@ import { supabase } from '@/lib/supabase'
 
 // Mock данные для случая когда Supabase не настроен
 const mockUnits: Unit[] = [
-  { id: 'mock-unit-1', name: 'штука', short_name: 'шт', description: 'Единица для штучного товара', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
-  { id: 'mock-unit-2', name: 'метр квадратный', short_name: 'м²', description: 'Единица площади', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
-  { id: 'mock-unit-3', name: 'метр кубический', short_name: 'м³', description: 'Единица объема', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
-  { id: 'mock-unit-4', name: 'метр погонный', short_name: 'м.п.', description: 'Единица длины для погонных материалов', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
-  { id: 'mock-unit-5', name: 'килограмм', short_name: 'кг', description: 'Единица массы', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
-  { id: 'mock-unit-6', name: 'тонна', short_name: 'т', description: 'Единица массы для больших объемов', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+  {
+    id: 'mock-unit-1',
+    name: 'штука',
+    short_name: 'шт',
+    description: 'Единица для штучного товара',
+    is_active: true,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+  },
+  {
+    id: 'mock-unit-2',
+    name: 'метр квадратный',
+    short_name: 'м²',
+    description: 'Единица площади',
+    is_active: true,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+  },
+  {
+    id: 'mock-unit-3',
+    name: 'метр кубический',
+    short_name: 'м³',
+    description: 'Единица объема',
+    is_active: true,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+  },
+  {
+    id: 'mock-unit-4',
+    name: 'метр погонный',
+    short_name: 'м.п.',
+    description: 'Единица длины для погонных материалов',
+    is_active: true,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+  },
+  {
+    id: 'mock-unit-5',
+    name: 'килограмм',
+    short_name: 'кг',
+    description: 'Единица массы',
+    is_active: true,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+  },
+  {
+    id: 'mock-unit-6',
+    name: 'тонна',
+    short_name: 'т',
+    description: 'Единица массы для больших объемов',
+    is_active: true,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+  },
 ]
 
 export interface Unit {
@@ -116,7 +164,7 @@ export const unitsApi = {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
-      
+
       console.log('API Request:', {
         table: 'units',
         action: 'create',
@@ -125,7 +173,7 @@ export const unitsApi = {
         timestamp: new Date().toISOString(),
         success: true,
       })
-      
+
       return newUnit
     }
 
@@ -157,13 +205,13 @@ export const unitsApi = {
       if (!existing) {
         throw new Error(`Единица с id ${id} не найдена`)
       }
-      
+
       const updated: Unit = {
         ...existing,
         ...unit,
         updated_at: new Date().toISOString(),
       }
-      
+
       console.log('API Request:', {
         table: 'units',
         action: 'update',
@@ -173,7 +221,7 @@ export const unitsApi = {
         timestamp: new Date().toISOString(),
         success: true,
       })
-      
+
       return updated
     }
 

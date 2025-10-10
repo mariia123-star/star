@@ -5,8 +5,10 @@ import ruRU from 'antd/locale/ru_RU'
 import MainLayout from '@/layout/MainLayout'
 import Dashboard from '@/pages/Dashboard'
 import Documents from '@/pages/documents/Documents'
-import TenderEstimate from '@/pages/documents/TenderEstimate'
 import TenderTest from '@/pages/documents/TenderTest'
+import TenderEstimates from '@/pages/documents/TenderEstimates'
+import TenderTestWithAutocomplete from '@/pages/documents/TenderTestWithAutocomplete'
+import EstimateCalculatorDemo from '@/pages/documents/EstimateCalculatorDemo'
 import Users from '@/pages/developer/Users'
 import Rates from '@/pages/developer/Rates'
 import Materials from '@/pages/developer/Materials'
@@ -45,19 +47,27 @@ function AppMain() {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/documents" element={<Documents />} />
+                <Route path="/documents/tender-test" element={<TenderTest />} />
                 <Route
-                  path="/documents/tender-estimate"
-                  element={<TenderEstimate />}
+                  path="/documents/tender-autocomplete"
+                  element={<TenderTestWithAutocomplete />}
                 />
                 <Route
-                  path="/documents/tender-test"
-                  element={<TenderTest />}
+                  path="/documents/tender-estimate"
+                  element={<TenderEstimates />}
+                />
+                <Route
+                  path="/documents/calculator"
+                  element={<EstimateCalculatorDemo />}
                 />
                 <Route path="/developer/users" element={<Users />} />
                 <Route path="/developer/rates" element={<Rates />} />
                 <Route path="/developer/materials" element={<Materials />} />
                 <Route path="/developer/audit-logs" element={<AuditLogs />} />
-                <Route path="/developer/database-debug" element={<DatabaseDebug />} />
+                <Route
+                  path="/developer/database-debug"
+                  element={<DatabaseDebug />}
+                />
                 <Route path="/references/projects" element={<Projects />} />
                 <Route path="/references/units" element={<UnitsReference />} />
                 <Route

@@ -1,14 +1,28 @@
 import React from 'react'
-import { Card, Row, Col, Typography, Statistic, Table, Progress, Space, Tag } from 'antd'
+import {
+  Card,
+  Row,
+  Col,
+  Typography,
+  Statistic,
+  Table,
+  Progress,
+  Space,
+  Tag,
+} from 'antd'
 import {
   DashboardOutlined,
   DollarOutlined,
   BuildOutlined,
   FileTextOutlined,
   RiseOutlined,
-  TruckOutlined
+  TruckOutlined,
 } from '@ant-design/icons'
-import { EstimateCalculations, EstimateAnalytics, EstimateItem } from '@/shared/types/estimate'
+import {
+  EstimateCalculations,
+  EstimateAnalytics,
+  EstimateItem,
+} from '@/shared/types/estimate'
 
 const { Title } = Typography
 
@@ -18,18 +32,22 @@ interface DashboardProps {
   items: EstimateItem[]
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ calculations, analytics, items: _items }) => {
+const Dashboard: React.FC<DashboardProps> = ({
+  calculations,
+  analytics,
+  items: _items,
+}) => {
   const formatCurrency = (value: number) => {
     return value.toLocaleString('ru-RU', {
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0
+      maximumFractionDigits: 0,
     })
   }
 
   const formatNumber = (value: number, decimals = 2) => {
     return value.toLocaleString('ru-RU', {
       minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals
+      maximumFractionDigits: decimals,
     })
   }
 
@@ -40,22 +58,23 @@ const Dashboard: React.FC<DashboardProps> = ({ calculations, analytics, items: _
       dataIndex: 'contractor',
       key: 'contractor',
       render: (text: string) => {
-        const color = text === 'Заказчик' ? 'blue' : text === 'раб' ? 'orange' : 'default'
+        const color =
+          text === 'Заказчик' ? 'blue' : text === 'раб' ? 'orange' : 'default'
         return <Tag color={color}>{text}</Tag>
-      }
+      },
     },
     {
       title: 'Сумма',
       dataIndex: 'total',
       key: 'total',
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value) + ' ₽'
+      render: (value: number) => formatCurrency(value) + ' ₽',
     },
     {
       title: 'Количество',
       dataIndex: 'count',
       key: 'count',
-      align: 'right' as const
+      align: 'right' as const,
     },
     {
       title: 'Доля',
@@ -69,11 +88,13 @@ const Dashboard: React.FC<DashboardProps> = ({ calculations, analytics, items: _
             percent={value}
             showInfo={false}
             size="small"
-            strokeColor={value > 50 ? '#52c41a' : value > 25 ? '#faad14' : '#1890ff'}
+            strokeColor={
+              value > 50 ? '#52c41a' : value > 25 ? '#faad14' : '#1890ff'
+            }
           />
         </Space>
-      )
-    }
+      ),
+    },
   ]
 
   // Колонки для таблицы топ дорогих позиций
@@ -82,13 +103,13 @@ const Dashboard: React.FC<DashboardProps> = ({ calculations, analytics, items: _
       title: '№',
       dataIndex: 'number',
       key: 'number',
-      width: 80
+      width: 80,
     },
     {
       title: 'Наименование работ',
       dataIndex: 'workDescription',
       key: 'workDescription',
-      ellipsis: true
+      ellipsis: true,
     },
     {
       title: 'Сумма',
@@ -96,7 +117,7 @@ const Dashboard: React.FC<DashboardProps> = ({ calculations, analytics, items: _
       key: 'total',
       align: 'right' as const,
       width: 120,
-      render: (value: number) => formatCurrency(value) + ' ₽'
+      render: (value: number) => formatCurrency(value) + ' ₽',
     },
     {
       title: 'Объем',
@@ -105,8 +126,8 @@ const Dashboard: React.FC<DashboardProps> = ({ calculations, analytics, items: _
       align: 'right' as const,
       width: 100,
       render: (value: number, record: EstimateItem) =>
-        `${formatNumber(value, 2)} ${record.unit}`
-    }
+        `${formatNumber(value, 2)} ${record.unit}`,
+    },
   ]
 
   // Колонки для таблицы по единицам измерения
@@ -114,35 +135,35 @@ const Dashboard: React.FC<DashboardProps> = ({ calculations, analytics, items: _
     {
       title: 'Единица',
       dataIndex: 'unit',
-      key: 'unit'
+      key: 'unit',
     },
     {
       title: 'Общий объем',
       dataIndex: 'totalVolume',
       key: 'totalVolume',
       align: 'right' as const,
-      render: (value: number) => formatNumber(value, 2)
+      render: (value: number) => formatNumber(value, 2),
     },
     {
       title: 'Средняя цена',
       dataIndex: 'avgPrice',
       key: 'avgPrice',
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value) + ' ₽'
+      render: (value: number) => formatCurrency(value) + ' ₽',
     },
     {
       title: 'Позиций',
       dataIndex: 'count',
       key: 'count',
-      align: 'right' as const
-    }
+      align: 'right' as const,
+    },
   ]
 
   console.log('Dashboard: Рендеринг дашборда', {
     totalSum: calculations.totalSum,
     itemsCount: calculations.itemsCount,
     contractorsCount: analytics.byContractor.length,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   })
 
   return (
@@ -165,7 +186,7 @@ const Dashboard: React.FC<DashboardProps> = ({ calculations, analytics, items: _
               valueStyle={{ color: '#1890ff' }}
               prefix={<DollarOutlined />}
               suffix="₽"
-              formatter={(value) => formatCurrency(Number(value))}
+              formatter={value => formatCurrency(Number(value))}
             />
           </Card>
         </Col>
@@ -185,7 +206,7 @@ const Dashboard: React.FC<DashboardProps> = ({ calculations, analytics, items: _
               value={calculations.totalVolume}
               precision={2}
               prefix={<BuildOutlined />}
-              formatter={(value) => formatNumber(Number(value), 2)}
+              formatter={value => formatNumber(Number(value), 2)}
             />
           </Card>
         </Col>
@@ -198,7 +219,7 @@ const Dashboard: React.FC<DashboardProps> = ({ calculations, analytics, items: _
               valueStyle={{ color: '#52c41a' }}
               prefix={<RiseOutlined />}
               suffix="₽"
-              formatter={(value) => formatCurrency(Number(value))}
+              formatter={value => formatCurrency(Number(value))}
             />
           </Card>
         </Col>
@@ -211,7 +232,7 @@ const Dashboard: React.FC<DashboardProps> = ({ calculations, analytics, items: _
               valueStyle={{ color: '#faad14' }}
               prefix={<BuildOutlined />}
               suffix="₽"
-              formatter={(value) => formatCurrency(Number(value))}
+              formatter={value => formatCurrency(Number(value))}
             />
           </Card>
         </Col>
@@ -224,7 +245,7 @@ const Dashboard: React.FC<DashboardProps> = ({ calculations, analytics, items: _
               valueStyle={{ color: '#722ed1' }}
               prefix={<TruckOutlined />}
               suffix="₽"
-              formatter={(value) => formatCurrency(Number(value))}
+              formatter={value => formatCurrency(Number(value))}
             />
           </Card>
         </Col>
@@ -242,7 +263,7 @@ const Dashboard: React.FC<DashboardProps> = ({ calculations, analytics, items: _
               columns={contractorColumns}
               dataSource={analytics.byContractor.map((item, index) => ({
                 ...item,
-                key: index
+                key: index,
               }))}
               pagination={false}
               size="small"
@@ -263,14 +284,14 @@ const Dashboard: React.FC<DashboardProps> = ({ calculations, analytics, items: _
                   title: 'Тип материала',
                   dataIndex: 'materialType',
                   key: 'materialType',
-                  ellipsis: true
+                  ellipsis: true,
                 },
                 {
                   title: 'Сумма',
                   dataIndex: 'total',
                   key: 'total',
                   align: 'right' as const,
-                  render: (value: number) => formatCurrency(value) + ' ₽'
+                  render: (value: number) => formatCurrency(value) + ' ₽',
                 },
                 {
                   title: 'Доля',
@@ -287,12 +308,12 @@ const Dashboard: React.FC<DashboardProps> = ({ calculations, analytics, items: _
                         strokeColor="#52c41a"
                       />
                     </Space>
-                  )
-                }
+                  ),
+                },
               ]}
               dataSource={analytics.byMaterialType.map((item, index) => ({
                 ...item,
-                key: index
+                key: index,
               }))}
               pagination={false}
               size="small"
@@ -311,7 +332,7 @@ const Dashboard: React.FC<DashboardProps> = ({ calculations, analytics, items: _
               columns={expensiveItemsColumns}
               dataSource={analytics.topExpensiveItems.map((item, index) => ({
                 ...item,
-                key: index
+                key: index,
               }))}
               pagination={false}
               size="small"
@@ -330,7 +351,7 @@ const Dashboard: React.FC<DashboardProps> = ({ calculations, analytics, items: _
               columns={unitColumns}
               dataSource={analytics.byUnit.map((item, index) => ({
                 ...item,
-                key: index
+                key: index,
               }))}
               pagination={false}
               size="small"

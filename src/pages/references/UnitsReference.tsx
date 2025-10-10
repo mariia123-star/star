@@ -11,7 +11,12 @@ import {
   message,
   Popconfirm,
 } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, ColumnHeightOutlined } from '@ant-design/icons'
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  ColumnHeightOutlined,
+} from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { unitsApi, Unit, UnitUpdate } from '@/entities/units'
 
@@ -198,7 +203,15 @@ function UnitsReference() {
               <ColumnHeightOutlined />
             </div>
             <div>
-              <Title level={2} style={{ margin: 0, color: '#1a1a1a', fontSize: 28, fontWeight: 700 }}>
+              <Title
+                level={2}
+                style={{
+                  margin: 0,
+                  color: '#1a1a1a',
+                  fontSize: 28,
+                  fontWeight: 700,
+                }}
+              >
                 Единицы измерения
               </Title>
               <div style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>
@@ -206,11 +219,11 @@ function UnitsReference() {
               </div>
             </div>
           </div>
-          <Button 
-            type="primary" 
+          <Button
+            type="primary"
             size="large"
             className="modern-add-button units"
-            icon={<PlusOutlined />} 
+            icon={<PlusOutlined />}
             onClick={handleAdd}
           >
             Добавить единицу

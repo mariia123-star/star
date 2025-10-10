@@ -8,10 +8,7 @@ import {
   message,
 } from 'antd'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  projectsApi,
-  Project,
-} from '../shared/api/projects'
+import { projectsApi, Project, UpdateProjectData } from '../shared/api/projects'
 import dayjs from 'dayjs'
 
 interface ProjectModalProps {
@@ -185,7 +182,9 @@ const ProjectModal = ({ visible, onClose, project }: ProjectModalProps) => {
               formatter={value =>
                 `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
               }
-              parser={value => Number(value!.replace(/\s?₽|(,*)/g, '')) || 0}
+              parser={value =>
+                (Number(value!.replace(/\s?₽|(,*)/g, '')) || 0) as unknown as 0
+              }
             />
           </Form.Item>
         </div>

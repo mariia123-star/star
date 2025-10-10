@@ -15,6 +15,7 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   AuditOutlined,
+  CalculatorOutlined,
 } from '@ant-design/icons'
 
 const { Header, Sider, Content } = Layout
@@ -38,15 +39,21 @@ const menuItems = [
     className: 'main-menu-item',
     children: [
       {
-        key: '/documents/tender-estimate',
+        key: '/documents/tender-test?new=true',
         icon: <FileOutlined />,
-        label: 'Тендерная смета',
+        label: 'Тендер - тест',
         className: 'sub-menu-item',
       },
       {
-        key: '/documents/tender-test',
-        icon: <FileOutlined />,
-        label: 'Тендер - тест',
+        key: '/documents/tender-estimate',
+        icon: <FileTextOutlined />,
+        label: 'Сохраненные сметы',
+        className: 'sub-menu-item',
+      },
+      {
+        key: '/documents/calculator',
+        icon: <CalculatorOutlined />,
+        label: 'Калькулятор смет',
         className: 'sub-menu-item',
       },
     ],
@@ -109,7 +116,8 @@ function MainLayout({ children }: MainLayoutProps) {
   const location = useLocation()
 
   const { token } = theme.useToken()
-  const { colorBgContainer, borderRadiusLG } = token
+  // const { colorBgContainer, borderRadiusLG } = token
+  console.log('Layout token:', token)
 
   const handleMenuClick = ({ key }: { key: string }) => {
     navigate(key)
@@ -155,9 +163,10 @@ function MainLayout({ children }: MainLayoutProps) {
         width={280}
         collapsedWidth={80}
         style={{
-          background: '#fafafa',
+          background: 'linear-gradient(180deg, #ffffff 0%, #fafafa 100%)',
           borderRight: '1px solid #e8e8e8',
           position: 'relative',
+          boxShadow: '2px 0 12px rgba(0, 0, 0, 0.04)',
         }}
       >
         <div
@@ -173,7 +182,10 @@ function MainLayout({ children }: MainLayoutProps) {
           }}
         >
           {!collapsed && (
-            <Title level={3} style={{ margin: 0, color: '#262626', fontWeight: 600 }}>
+            <Title
+              level={3}
+              style={{ margin: 0, color: '#262626', fontWeight: 600 }}
+            >
               STAR Portal
             </Title>
           )}
@@ -215,15 +227,17 @@ function MainLayout({ children }: MainLayoutProps) {
       <Layout>
         <Header
           style={{
-            padding: '0 24px',
-            background: '#fff',
+            padding: '0 32px',
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
             borderBottom: '1px solid #e8e8e8',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            boxShadow: '0 1px 4px rgba(0, 0, 0, 0.02)',
-            position: 'relative',
-            zIndex: 10,
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.04)',
+            position: 'sticky',
+            top: 0,
+            zIndex: 100,
+            backdropFilter: 'blur(10px)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -255,7 +269,7 @@ function MainLayout({ children }: MainLayoutProps) {
             >
               {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
             </button>
-            
+
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div
                 style={{
@@ -265,13 +279,13 @@ function MainLayout({ children }: MainLayoutProps) {
                   borderRadius: 2,
                 }}
               />
-              <Title 
-                level={4} 
-                style={{ 
-                  margin: 0, 
-                  color: '#262626', 
+              <Title
+                level={4}
+                style={{
+                  margin: 0,
+                  color: '#262626',
                   fontWeight: 600,
-                  fontSize: '18px'
+                  fontSize: '18px',
                 }}
               >
                 {getCurrentPageTitle()}
@@ -298,20 +312,22 @@ function MainLayout({ children }: MainLayoutProps) {
 
         <Content
           style={{
-            background: '#f8f9fa',
+            background: 'linear-gradient(135deg, #f5f7fa 0%, #f0f2f5 100%)',
             minHeight: 'calc(100vh - 64px)',
             position: 'relative',
+            padding: '24px',
           }}
         >
           <div
             style={{
-              padding: '24px',
+              padding: '32px',
               height: '100%',
               background: '#fff',
-              margin: '24px',
-              borderRadius: '12px',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02)',
+              borderRadius: '20px',
+              boxShadow:
+                '0 4px 12px rgba(0, 0, 0, 0.05), 0 2px 6px rgba(0, 0, 0, 0.03)',
               border: '1px solid #f0f0f0',
+              animation: 'fadeIn 0.4s ease',
             }}
           >
             {children}

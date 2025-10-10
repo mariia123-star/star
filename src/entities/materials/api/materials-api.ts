@@ -18,7 +18,7 @@ const mockMaterials: MaterialWithUnit[] = [
     unit_id: 'mock-unit-3',
     unit_name: 'метр кубический',
     unit_short_name: 'м³',
-    last_purchase_price: 4500.00,
+    last_purchase_price: 4500.0,
     supplier: 'ООО "БетонСтройМикс"',
     supplier_article: 'БСМ-М300',
     is_active: true,
@@ -34,7 +34,7 @@ const mockMaterials: MaterialWithUnit[] = [
     unit_id: 'mock-unit-5',
     unit_name: 'килограмм',
     unit_short_name: 'кг',
-    last_purchase_price: 65.80,
+    last_purchase_price: 65.8,
     supplier: 'ОАО "МеталлТорг"',
     supplier_article: 'МТ-А500С-12',
     is_active: true,
@@ -50,13 +50,13 @@ const mockMaterials: MaterialWithUnit[] = [
     unit_id: 'mock-unit-1',
     unit_name: 'штука',
     unit_short_name: 'шт',
-    last_purchase_price: 12.50,
+    last_purchase_price: 12.5,
     supplier: 'ЗАО "КерамСтрой"',
     supplier_article: 'КС-М150',
     is_active: true,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
-  }
+  },
 ]
 
 export const materialsApi = {
@@ -126,11 +126,11 @@ export const materialsApi = {
         timestamp: new Date().toISOString(),
         success: !!material,
       })
-      
+
       if (!material) {
         throw new Error(`Материал с id ${id} не найден`)
       }
-      
+
       return material
     }
 
@@ -175,7 +175,9 @@ export const materialsApi = {
 
   async getByCategory(category: string): Promise<MaterialWithUnit[]> {
     if (!supabase) {
-      const filtered = mockMaterials.filter(m => m.category === category && m.is_active)
+      const filtered = mockMaterials.filter(
+        m => m.category === category && m.is_active
+      )
       console.log('API Request:', {
         table: 'materials',
         action: 'select_by_category',
@@ -215,7 +217,9 @@ export const materialsApi = {
     if (error) {
       console.error('Get materials by category failed:', error)
       console.log('Switching to mock mode due to error')
-      const filteredMaterials = mockMaterials.filter(m => m.category === category && m.is_active)
+      const filteredMaterials = mockMaterials.filter(
+        m => m.category === category && m.is_active
+      )
       console.log('API Request:', {
         table: 'materials',
         action: 'select_by_category_fallback',
@@ -244,7 +248,7 @@ export const materialsApi = {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
-      
+
       console.log('API Request:', {
         table: 'materials',
         action: 'create',
@@ -253,7 +257,7 @@ export const materialsApi = {
         timestamp: new Date().toISOString(),
         success: true,
       })
-      
+
       return newMaterial
     }
 
@@ -308,13 +312,13 @@ export const materialsApi = {
       if (!existing) {
         throw new Error(`Материал с id ${id} не найден`)
       }
-      
+
       const updated: Material = {
         ...existing,
         ...materialData,
         updated_at: new Date().toISOString(),
       }
-      
+
       console.log('API Request:', {
         table: 'materials',
         action: 'update',
@@ -324,7 +328,7 @@ export const materialsApi = {
         timestamp: new Date().toISOString(),
         success: true,
       })
-      
+
       return updated
     }
 
@@ -439,7 +443,7 @@ export const materialsApi = {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }))
-      
+
       console.log('API Request:', {
         table: 'materials',
         action: 'bulk_import_complete',
@@ -448,7 +452,7 @@ export const materialsApi = {
         timestamp: new Date().toISOString(),
         success: true,
       })
-      
+
       return importedMaterials
     }
 
@@ -501,16 +505,18 @@ export const materialsApi = {
     if (error) {
       console.error('Bulk import materials failed:', error)
       console.log('Switching to mock mode due to error')
-      const newMaterials: MaterialWithUnit[] = materials.map((material, index) => ({
-        id: `mock-material-import-${Date.now()}-${index}`,
-        ...material,
-        unit_id: material.unit_id || 'mock-unit-1',
-        unit_name: 'штука',
-        unit_short_name: 'шт',
-        is_active: material.is_active ?? true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }))
+      const newMaterials: MaterialWithUnit[] = materials.map(
+        (material, index) => ({
+          id: `mock-material-import-${Date.now()}-${index}`,
+          ...material,
+          unit_id: material.unit_id || 'mock-unit-1',
+          unit_name: 'штука',
+          unit_short_name: 'шт',
+          is_active: material.is_active ?? true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+      )
       mockMaterials.push(...newMaterials)
       console.log('API Request:', {
         table: 'materials',

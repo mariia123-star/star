@@ -7,15 +7,19 @@ import {
   DashboardOutlined,
   ExportOutlined,
   SearchOutlined,
-  ClearOutlined
+  ClearOutlined,
 } from '@ant-design/icons'
-import { EstimateProvider, useEstimateData, useEstimateActions } from '@/features/estimate'
+import {
+  EstimateProvider,
+  useEstimateData,
+  useEstimateActions,
+} from '@/features/estimate'
 import {
   FileUpload,
   EstimateTable,
   Calculator,
   Dashboard,
-  ExportControls
+  ExportControls,
 } from '@/widgets/estimate'
 
 const { TabPane } = Tabs
@@ -24,20 +28,30 @@ const { Search } = Input
 
 const EstimatePortalContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState('upload')
-  const { items, filteredItems, calculations, analytics, filters, modifications, isLoading } = useEstimateData()
+  const {
+    items,
+    filteredItems,
+    calculations,
+    analytics,
+    filters,
+    modifications,
+    selectedProjectId,
+    isLoading,
+  } = useEstimateData()
   const {
     loadFromCSV,
     updateItem,
     toggleExpanded,
     setFilters,
     clearData,
-    undoModification
+    undoModification,
+    setSelectedProject,
   } = useEstimateActions()
 
   const handleDataLoaded = (result: any) => {
     console.log('EstimatePortal: Данные загружены', {
       itemsCount: result.data.length,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     })
 
     if (result.data.length > 0) {
@@ -48,7 +62,7 @@ const EstimatePortalContent: React.FC = () => {
   const handleSearch = (value: string) => {
     console.log('EstimatePortal: Поиск по данным', {
       searchValue: value,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     })
 
     setFilters({ search: value })
@@ -56,7 +70,7 @@ const EstimatePortalContent: React.FC = () => {
 
   const handleClearData = () => {
     console.log('EstimatePortal: Очистка всех данных', {
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     })
 
     clearData()
@@ -74,12 +88,9 @@ const EstimatePortalContent: React.FC = () => {
       ),
       children: (
         <div style={{ padding: '24px 0' }}>
-          <FileUpload
-            onDataLoaded={handleDataLoaded}
-            loading={isLoading}
-          />
+          <FileUpload onDataLoaded={handleDataLoaded} loading={isLoading} />
         </div>
-      )
+      ),
     },
     {
       key: 'table',
@@ -98,7 +109,7 @@ const EstimatePortalContent: React.FC = () => {
                 <Search
                   placeholder="Поиск по наименованию работ..."
                   value={filters.search}
-                  onChange={(e) => handleSearch(e.target.value)}
+                  onChange={e => handleSearch(e.target.value)}
                   onSearch={handleSearch}
                   style={{ maxWidth: 400 }}
                   prefix={<SearchOutlined />}
@@ -127,7 +138,7 @@ const EstimatePortalContent: React.FC = () => {
           />
         </div>
       ),
-      disabled: items.length === 0
+      disabled: items.length === 0,
     },
     {
       key: 'calculator',
@@ -145,11 +156,13 @@ const EstimatePortalContent: React.FC = () => {
             onApplyVolumeChange={() => {}}
             onApplyPriceChange={() => {}}
             onUndoModification={undoModification}
+            onProjectChange={setSelectedProject}
+            selectedProjectId={selectedProjectId}
             loading={isLoading}
           />
         </div>
       ),
-      disabled: items.length === 0
+      disabled: items.length === 0,
     },
     {
       key: 'dashboard',
@@ -168,7 +181,7 @@ const EstimatePortalContent: React.FC = () => {
           />
         </div>
       ),
-      disabled: items.length === 0
+      disabled: items.length === 0,
     },
     {
       key: 'export',
@@ -195,19 +208,22 @@ const EstimatePortalContent: React.FC = () => {
                     <strong>Позиций в смете:</strong> {calculations.itemsCount}
                   </div>
                   <div>
-                    <strong>Общая сумма:</strong> {calculations.totalSum.toLocaleString('ru-RU')} ₽
+                    <strong>Общая сумма:</strong>{' '}
+                    {calculations.totalSum.toLocaleString('ru-RU')} ₽
                   </div>
                   <div>
-                    <strong>Общий объем:</strong> {calculations.totalVolume.toLocaleString('ru-RU', {
+                    <strong>Общий объем:</strong>{' '}
+                    {calculations.totalVolume.toLocaleString('ru-RU', {
                       minimumFractionDigits: 2,
-                      maximumFractionDigits: 2
+                      maximumFractionDigits: 2,
                     })}
                   </div>
                   <div>
                     <strong>Изменений:</strong> {modifications.length}
                   </div>
                   <div>
-                    <strong>Последнее обновление:</strong> {new Date().toLocaleString('ru-RU')}
+                    <strong>Последнее обновление:</strong>{' '}
+                    {new Date().toLocaleString('ru-RU')}
                   </div>
                 </Space>
               </Card>
@@ -215,8 +231,8 @@ const EstimatePortalContent: React.FC = () => {
           </Row>
         </div>
       ),
-      disabled: items.length === 0
-    }
+      disabled: items.length === 0,
+    },
   ]
 
   return (
@@ -225,7 +241,7 @@ const EstimatePortalContent: React.FC = () => {
         height: 'calc(100vh - 96px)',
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden'
+        overflow: 'hidden',
       }}
     >
       <div style={{ flexShrink: 0, padding: '0 24px 16px' }}>

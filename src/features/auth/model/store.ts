@@ -79,7 +79,7 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
     try {
       const {
         data: { session },
-      } = await supabase?.auth.getSession() || { data: { session: null } }
+      } = (await supabase?.auth.getSession()) || { data: { session: null } }
 
       set({
         user: (session?.user as User) || null,

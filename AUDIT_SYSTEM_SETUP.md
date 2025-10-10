@@ -100,14 +100,14 @@ await auditLogApi.create({
   table_name: 'products',
   record_id: '123',
   new_values: { name: 'Новый продукт' },
-  changes_summary: 'Создан новый продукт'
+  changes_summary: 'Создан новый продукт',
 })
 
 // Получить логи с фильтрацией
 const logs = await auditLogApi.getAll({
   action_type: 'update',
   date_from: '2024-01-01',
-  limit: 100
+  limit: 100,
 })
 ```
 

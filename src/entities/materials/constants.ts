@@ -44,6 +44,16 @@ export const MATERIAL_CATEGORIES = {
     name: 'Электрооборудование',
     color: 'yellow',
   },
+  FACADE: {
+    id: 'facade',
+    name: 'Фасадные материалы',
+    color: 'magenta',
+  },
+  TRANSPARENT: {
+    id: 'transparent',
+    name: 'Светопрозрачные конструкции',
+    color: 'volcano',
+  },
   OTHER: {
     id: 'other',
     name: 'Прочие материалы',

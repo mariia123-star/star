@@ -1,6 +1,19 @@
 import React, { useState } from 'react'
-import { Upload, message, Card, Typography, Progress, Alert, Button, Space } from 'antd'
-import { InboxOutlined, FileTextOutlined, LoadingOutlined } from '@ant-design/icons'
+import {
+  Upload,
+  message,
+  Card,
+  Typography,
+  Progress,
+  Alert,
+  Button,
+  Space,
+} from 'antd'
+import {
+  InboxOutlined,
+  FileTextOutlined,
+  LoadingOutlined,
+} from '@ant-design/icons'
 import { CSVParser } from '@/shared/lib/csvParser'
 import { CSVParseResult } from '@/shared/types/estimate'
 
@@ -12,7 +25,10 @@ interface FileUploadProps {
   loading?: boolean
 }
 
-const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded, loading = false }) => {
+const FileUpload: React.FC<FileUploadProps> = ({
+  onDataLoaded,
+  loading = false,
+}) => {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [parseResult, setParseResult] = useState<CSVParseResult | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -22,7 +38,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded, loading = false }
       fileName: file.name,
       fileSize: file.size,
       fileType: file.type,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     })
 
     setIsProcessing(true)
@@ -47,7 +63,9 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded, loading = false }
       setParseResult(result)
 
       if (result.errors.length > 0) {
-        message.warning(`Файл загружен с предупреждениями: ${result.errors.length} ошибок`)
+        message.warning(
+          `Файл загружен с предупреждениями: ${result.errors.length} ошибок`
+        )
       } else {
         message.success(`Файл успешно загружен: ${result.data.length} позиций`)
       }
@@ -56,11 +74,11 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded, loading = false }
         success: result.errors.length === 0,
         itemsCount: result.data.length,
         errorsCount: result.errors.length,
-        skippedRows: result.skippedRows
+        skippedRows: result.skippedRows,
       })
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка'
+      const errorMessage =
+        error instanceof Error ? error.message : 'Неизвестная ошибка'
       message.error(`Ошибка загрузки файла: ${errorMessage}`)
       console.error('FileUpload: Ошибка обработки файла', error)
       setParseResult(null)
@@ -75,7 +93,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded, loading = false }
     multiple: false,
     accept: '.csv,.txt',
     beforeUpload: (file: globalThis.File) => {
-      const isCSV = file.type === 'text/csv' || file.name.endsWith('.csv') || file.name.endsWith('.txt')
+      const isCSV =
+        file.type === 'text/csv' ||
+        file.name.endsWith('.csv') ||
+        file.name.endsWith('.txt')
       if (!isCSV) {
         message.error('Можно загружать только CSV файлы!')
         return false
@@ -90,7 +111,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded, loading = false }
       handleFileUpload(file)
       return false // Предотвращаем автоматическую загрузку
     },
-    disabled: loading || isProcessing
+    disabled: loading || isProcessing,
   }
 
   const handleConfirmLoad = () => {
@@ -122,11 +143,14 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded, loading = false }
             {isProcessing ? <LoadingOutlined /> : <InboxOutlined />}
           </p>
           <p className="ant-upload-text">
-            {isProcessing ? 'Обработка файла...' : 'Нажмите или перетащите файл в эту область'}
+            {isProcessing
+              ? 'Обработка файла...'
+              : 'Нажмите или перетащите файл в эту область'}
           </p>
           <p className="ant-upload-hint">
-            Файл должен содержать колонки: № п/п, Заказчик, Тип материала, Наименование работ,
-            Ед. изм., Объем, Коэф. расхода мат-лов, Цена работы, Цена материалов с НДС, Доставка, Итого
+            Файл должен содержать колонки: № п/п, Заказчик, Тип материала,
+            Наименование работ, Ед. изм., Объем, Коэф. расхода мат-лов, Цена
+            работы, Цена материалов с НДС, Доставка, Итого
           </p>
         </Dragger>
 
@@ -146,18 +170,29 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded, loading = false }
               message="Предпросмотр результатов загрузки"
               description={
                 <div>
-                  <p><strong>Всего строк:</strong> {parseResult.totalRows}</p>
-                  <p><strong>Загружено позиций:</strong> {parseResult.data.length}</p>
-                  <p><strong>Пропущено строк:</strong> {parseResult.skippedRows}</p>
+                  <p>
+                    <strong>Всего строк:</strong> {parseResult.totalRows}
+                  </p>
+                  <p>
+                    <strong>Загружено позиций:</strong>{' '}
+                    {parseResult.data.length}
+                  </p>
+                  <p>
+                    <strong>Пропущено строк:</strong> {parseResult.skippedRows}
+                  </p>
                   {parseResult.errors.length > 0 && (
                     <div>
-                      <p><strong>Ошибки:</strong></p>
+                      <p>
+                        <strong>Ошибки:</strong>
+                      </p>
                       <ul style={{ margin: 0, paddingLeft: 20 }}>
                         {parseResult.errors.slice(0, 5).map((error, index) => (
                           <li key={index}>{error}</li>
                         ))}
                         {parseResult.errors.length > 5 && (
-                          <li>... и еще {parseResult.errors.length - 5} ошибок</li>
+                          <li>
+                            ... и еще {parseResult.errors.length - 5} ошибок
+                          </li>
                         )}
                       </ul>
                     </div>
@@ -175,9 +210,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded, loading = false }
               >
                 Загрузить данные
               </Button>
-              <Button onClick={handleCancelLoad}>
-                Отмена
-              </Button>
+              <Button onClick={handleCancelLoad}>Отмена</Button>
             </Space>
           </div>
         )}

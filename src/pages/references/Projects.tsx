@@ -142,8 +142,12 @@ function Projects() {
     setEditingProject(project)
     form.setFieldsValue({
       ...project,
-      start_date: project.start_date ? dayjs(project.start_date).format('YYYY-MM-DD') : undefined,
-      end_date: project.end_date ? dayjs(project.end_date).format('YYYY-MM-DD') : undefined,
+      start_date: project.start_date
+        ? dayjs(project.start_date).format('YYYY-MM-DD')
+        : undefined,
+      end_date: project.end_date
+        ? dayjs(project.end_date).format('YYYY-MM-DD')
+        : undefined,
     })
     setIsModalOpen(true)
   }
@@ -350,7 +354,15 @@ function Projects() {
               <FolderOutlined />
             </div>
             <div>
-              <Title level={2} style={{ margin: 0, color: '#1a1a1a', fontSize: 28, fontWeight: 700 }}>
+              <Title
+                level={2}
+                style={{
+                  margin: 0,
+                  color: '#1a1a1a',
+                  fontSize: 28,
+                  fontWeight: 700,
+                }}
+              >
                 Проекты
               </Title>
               <div style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>
@@ -358,11 +370,11 @@ function Projects() {
               </div>
             </div>
           </div>
-          <Button 
-            type="primary" 
+          <Button
+            type="primary"
             size="large"
             className="modern-add-button projects"
-            icon={<PlusOutlined />} 
+            icon={<PlusOutlined />}
             onClick={handleAdd}
           >
             Добавить проект

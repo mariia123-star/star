@@ -53,25 +53,7 @@ class RateMaterialsApi {
 
     const { data, error } = await supabase
       .from('rate_materials_mapping')
-      .select(`
-        *,
-        material:materials (
-          id,
-          code,
-          name,
-          description,
-          unit_id,
-          unit_name,
-          unit_short_name,
-          last_purchase_price,
-          is_active,
-          unit:units (
-            id,
-            name,
-            short_name
-          )
-        )
-      `)
+      .select('*')
       .eq('rate_id', rateId)
       .order('created_at', { ascending: true })
 
@@ -106,25 +88,7 @@ class RateMaterialsApi {
     const { data, error } = await supabase
       .from('rate_materials_mapping')
       .insert(rateMaterial)
-      .select(`
-        *,
-        material:materials (
-          id,
-          code,
-          name,
-          description,
-          unit_id,
-          unit_name,
-          unit_short_name,
-          last_purchase_price,
-          is_active,
-          unit:units (
-            id,
-            name,
-            short_name
-          )
-        )
-      `)
+      .select('*')
       .single()
 
     console.log('API Response: Rate material created', {
@@ -164,25 +128,7 @@ class RateMaterialsApi {
       .from('rate_materials_mapping')
       .update(updateData)
       .eq('id', id)
-      .select(`
-        *,
-        material:materials (
-          id,
-          code,
-          name,
-          description,
-          unit_id,
-          unit_name,
-          unit_short_name,
-          last_purchase_price,
-          is_active,
-          unit:units (
-            id,
-            name,
-            short_name
-          )
-        )
-      `)
+      .select('*')
       .single()
 
     console.log('API Response: Rate material updated', {
@@ -230,7 +176,9 @@ class RateMaterialsApi {
   }
 
   // Пакетное добавление материалов к расценке
-  async createMany(rateMaterials: RateMaterialCreate[]): Promise<RateMaterial[]> {
+  async createMany(
+    rateMaterials: RateMaterialCreate[]
+  ): Promise<RateMaterial[]> {
     if (!supabase) {
       console.error('Supabase client not initialized')
       throw new Error('Database connection not available')
@@ -245,25 +193,7 @@ class RateMaterialsApi {
     const { data, error } = await supabase
       .from('rate_materials_mapping')
       .insert(rateMaterials)
-      .select(`
-        *,
-        material:materials (
-          id,
-          code,
-          name,
-          description,
-          unit_id,
-          unit_name,
-          unit_short_name,
-          last_purchase_price,
-          is_active,
-          unit:units (
-            id,
-            name,
-            short_name
-          )
-        )
-      `)
+      .select('*')
 
     console.log('API Response: Multiple rate materials created', {
       action: 'create_many_rate_materials_response',

@@ -7,10 +7,16 @@ import {
   CaretRightOutlined,
   CaretDownOutlined,
   CommentOutlined,
-  CalculatorOutlined
+  CalculatorOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { EstimatePosition, ESTIMATE_COLORS, JUSTIFICATION_TYPES, UNITS } from '@/shared/types/estimate'
+import {
+  EstimatePosition,
+  ESTIMATE_COLORS,
+  JUSTIFICATION_TYPES,
+  UNITS,
+} from '@/shared/types/estimate'
+import { useMaterialTypes } from '@/shared/hooks/useMaterialTypes'
 
 const { Text } = Typography
 
@@ -24,6 +30,8 @@ interface EstimateTableProps {
   onSelectionChange: (selectedIds: string[]) => void
   isEditing?: boolean
   searchTerm?: string
+  editingCell?: { id: string; field: string } | null
+  onEditingCellChange?: (cell: { id: string; field: string } | null) => void
 }
 
 export default function EstimateTable({
@@ -34,9 +42,38 @@ export default function EstimateTable({
   onToggleExpanded,
   selectedPositions,
   onSelectionChange,
-  searchTerm = ''
+  searchTerm = '',
+  editingCell: externalEditingCell,
+  onEditingCellChange,
 }: EstimateTableProps) {
-  const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null)
+  const [internalEditingCell, setInternalEditingCell] = useState<{
+    id: string
+    field: string
+  } | null>(null)
+  const { data: materialTypes = [] } = useMaterialTypes()
+
+  // Используем внешний editingCell если он передан, иначе внутренний
+  const editingCell =
+    externalEditingCell !== undefined
+      ? externalEditingCell
+      : internalEditingCell
+
+  // Функция для изменения editingCell
+  const setEditingCell = (cell: { id: string; field: string } | null) => {
+    if (onEditingCellChange) {
+      onEditingCellChange(cell)
+    } else {
+      setInternalEditingCell(cell)
+    }
+  }
+
+  // Функция для отображения типов материалов
+  const getMaterialTypeDisplayName = (shortName: string): string => {
+    const materialType = materialTypes.find(
+      type => type.short_name === shortName
+    )
+    return materialType ? materialType.name : shortName
+  }
 
   // const getRowStyle = (record: EstimatePosition) => {
   //   const colors = ESTIMATE_COLORS
@@ -67,7 +104,11 @@ export default function EstimateTable({
     return position.volume * position.workPrice
   }
 
-  const handleCellEdit = (record: EstimatePosition, field: string, value: unknown) => {
+  const handleCellEdit = (
+    record: EstimatePosition,
+    field: string,
+    value: unknown
+  ) => {
     const updates: Partial<EstimatePosition> = { [field]: value }
 
     if (field === 'volume' || field === 'workPrice') {
@@ -84,7 +125,7 @@ export default function EstimateTable({
       field,
       value,
       newTotal: updates.total,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     })
   }
 
@@ -95,7 +136,8 @@ export default function EstimateTable({
     type: 'text' | 'number' | 'select' = 'text',
     options?: string[]
   ) => {
-    const isEditing = editingCell?.id === record.id && editingCell?.field === field
+    const isEditing =
+      editingCell?.id === record.id && editingCell?.field === field
 
     if (!isEditing) {
       return (
@@ -105,13 +147,12 @@ export default function EstimateTable({
             cursor: !isEditing ? 'pointer' : 'default',
             minHeight: '32px',
             display: 'flex',
-            alignItems: 'center'
+            alignItems: 'center',
           }}
         >
           {type === 'number' && typeof value === 'number'
             ? value.toLocaleString('ru-RU', { minimumFractionDigits: 2 })
-            : value || '—'
-          }
+            : value || '—'}
         </div>
       )
     }
@@ -121,7 +162,7 @@ export default function EstimateTable({
         <Select
           value={value}
           style={{ width: '100%' }}
-          onChange={(val) => handleCellEdit(record, field, val)}
+          onChange={val => handleCellEdit(record, field, val)}
           autoFocus
           showSearch
           options={options?.map(opt => ({ label: opt, value: opt }))}
@@ -131,11 +172,17 @@ export default function EstimateTable({
 
     return (
       <Input
-        value={value}
+        defaultValue={value as string | number}
         type={type}
         style={{ width: '100%' }}
-        onBlur={(e) => handleCellEdit(record, field, type === 'number' ? Number(e.target.value) : e.target.value)}
-        onPressEnter={(e) => {
+        onBlur={e =>
+          handleCellEdit(
+            record,
+            field,
+            type === 'number' ? Number(e.target.value) : e.target.value
+          )
+        }
+        onPressEnter={e => {
           const target = e.target as globalThis.HTMLInputElement
           const value = type === 'number' ? Number(target.value) : target.value
           handleCellEdit(record, field, value)
@@ -146,7 +193,10 @@ export default function EstimateTable({
   }
 
   const flattenedPositions = useMemo(() => {
-    const flatten = (positions: EstimatePosition[], level = 0): EstimatePosition[] => {
+    const flatten = (
+      positions: EstimatePosition[],
+      level = 0
+    ): EstimatePosition[] => {
       const result: EstimatePosition[] = []
 
       positions.forEach(position => {
@@ -167,10 +217,11 @@ export default function EstimateTable({
   const filteredPositions = useMemo(() => {
     if (!searchTerm) return flattenedPositions
 
-    return flattenedPositions.filter(position =>
-      position.workName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      position.number.includes(searchTerm) ||
-      position.justification.toLowerCase().includes(searchTerm.toLowerCase())
+    return flattenedPositions.filter(
+      position =>
+        position.workName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        position.number.includes(searchTerm) ||
+        position.justification.toLowerCase().includes(searchTerm.toLowerCase())
     )
   }, [flattenedPositions, searchTerm])
 
@@ -187,8 +238,10 @@ export default function EstimateTable({
             <Button
               type="text"
               size="small"
-              icon={record.expanded ? <CaretDownOutlined /> : <CaretRightOutlined />}
-              onClick={(e) => {
+              icon={
+                record.expanded ? <CaretDownOutlined /> : <CaretRightOutlined />
+              }
+              onClick={e => {
                 e.stopPropagation()
                 onToggleExpanded(record.id)
               }}
@@ -204,13 +257,10 @@ export default function EstimateTable({
       dataIndex: 'justification',
       key: 'justification',
       width: 120,
-      render: (value, record) => renderEditableCell(
-        value,
-        record,
-        'justification',
-        'select',
-        JUSTIFICATION_TYPES
-      ),
+      render: (value, record) =>
+        renderEditableCell(value, record, 'justification', 'select', [
+          ...JUSTIFICATION_TYPES,
+        ]),
       filters: JUSTIFICATION_TYPES.map(type => ({ text: type, value: type })),
       onFilter: (value, record) => record.justification === value,
     },
@@ -219,13 +269,55 @@ export default function EstimateTable({
       dataIndex: 'materialType',
       key: 'materialType',
       width: 120,
-      render: (value, record) => renderEditableCell(
-        value,
-        record,
-        'materialType',
-        'select',
-        ['основа', 'вспом']
-      ),
+      render: (value, record) => {
+        const isEditing =
+          editingCell?.id === record.id && editingCell?.field === 'materialType'
+
+        if (!isEditing) {
+          return (
+            <div
+              onClick={() =>
+                setEditingCell({ id: record.id, field: 'materialType' })
+              }
+              style={{
+                cursor: 'pointer',
+                minHeight: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                padding: '4px 8px',
+              }}
+            >
+              {value ? getMaterialTypeDisplayName(value) : ''}
+            </div>
+          )
+        }
+
+        return (
+          <Select
+            value={value}
+            onChange={newValue => {
+              onPositionUpdate(record.id, { materialType: newValue })
+              setEditingCell(null)
+            }}
+            onBlur={() => setEditingCell(null)}
+            style={{ width: '100%' }}
+            size="small"
+            autoFocus
+            allowClear
+            showSearch
+            filterOption={(input, option) => {
+              const text = (option?.children || option?.label)?.toString() || ''
+              return text.toLowerCase().includes(input.toLowerCase())
+            }}
+          >
+            {materialTypes.map(type => (
+              <Select.Option key={type.id} value={type.short_name}>
+                {type.name} ({type.short_name})
+              </Select.Option>
+            ))}
+          </Select>
+        )
+      },
     },
     {
       title: 'Наименование работ',
@@ -233,12 +325,19 @@ export default function EstimateTable({
       key: 'workName',
       width: 400,
       render: (value, record) => renderEditableCell(value, record, 'workName'),
-      filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
+      filterDropdown: ({
+        setSelectedKeys,
+        selectedKeys,
+        confirm,
+        clearFilters,
+      }) => (
         <div style={{ padding: 8 }}>
           <Input
             placeholder="Поиск по наименованию"
             value={selectedKeys[0]}
-            onChange={e => setSelectedKeys(e.target.value ? [e.target.value] : [])}
+            onChange={e =>
+              setSelectedKeys(e.target.value ? [e.target.value] : [])
+            }
             onPressEnter={() => confirm()}
             style={{ marginBottom: 8, display: 'block' }}
           />
@@ -251,7 +350,11 @@ export default function EstimateTable({
             >
               Найти
             </Button>
-            <Button onClick={() => clearFilters?.()} size="small" style={{ width: 90 }}>
+            <Button
+              onClick={() => clearFilters?.()}
+              size="small"
+              style={{ width: 90 }}
+            >
               Сброс
             </Button>
           </Space>
@@ -265,20 +368,16 @@ export default function EstimateTable({
       dataIndex: 'unit',
       key: 'unit',
       width: 100,
-      render: (value, record) => renderEditableCell(
-        value,
-        record,
-        'unit',
-        'select',
-        UNITS
-      ),
+      render: (value, record) =>
+        renderEditableCell(value, record, 'unit', 'select', [...UNITS]),
     },
     {
       title: 'Объем',
       dataIndex: 'volume',
       key: 'volume',
       width: 120,
-      render: (value, record) => renderEditableCell(value, record, 'volume', 'number'),
+      render: (value, record) =>
+        renderEditableCell(value, record, 'volume', 'number'),
       sorter: (a, b) => a.volume - b.volume,
     },
     {
@@ -286,14 +385,16 @@ export default function EstimateTable({
       dataIndex: 'materialNorm',
       key: 'materialNorm',
       width: 150,
-      render: (value, record) => renderEditableCell(value, record, 'materialNorm', 'number'),
+      render: (value, record) =>
+        renderEditableCell(value, record, 'materialNorm', 'number'),
     },
     {
       title: 'Цена работ за ед.изм., руб.',
       dataIndex: 'workPrice',
       key: 'workPrice',
       width: 180,
-      render: (value, record) => renderEditableCell(value, record, 'workPrice', 'number'),
+      render: (value, record) =>
+        renderEditableCell(value, record, 'workPrice', 'number'),
       sorter: (a, b) => a.workPrice - b.workPrice,
     },
     {
@@ -301,23 +402,26 @@ export default function EstimateTable({
       dataIndex: 'materialPrice',
       key: 'materialPrice',
       width: 150,
-      render: (value, record) => renderEditableCell(value, record, 'materialPrice', 'number'),
+      render: (value, record) =>
+        renderEditableCell(value, record, 'materialPrice', 'number'),
     },
     {
       title: 'Поставка материалов, руб.',
       dataIndex: 'deliveryPrice',
       key: 'deliveryPrice',
       width: 180,
-      render: (value, record) => renderEditableCell(value, record, 'deliveryPrice', 'number'),
+      render: (value, record) =>
+        renderEditableCell(value, record, 'deliveryPrice', 'number'),
     },
     {
       title: 'Итого, руб.',
       dataIndex: 'total',
       key: 'total',
       width: 150,
-      render: (value) => (
+      render: value => (
         <Text strong style={{ color: '#16a34a' }}>
-          {value?.toLocaleString('ru-RU', { minimumFractionDigits: 2 }) || '0.00'}
+          {value?.toLocaleString('ru-RU', { minimumFractionDigits: 2 }) ||
+            '0.00'}
         </Text>
       ),
       sorter: (a, b) => a.total - b.total,
@@ -334,7 +438,7 @@ export default function EstimateTable({
               type="text"
               size="small"
               icon={<PlusOutlined />}
-              onClick={(e) => {
+              onClick={e => {
                 e.stopPropagation()
                 onPositionAdd(record.id)
                 console.log('Add subitem clicked:', record.id)
@@ -346,7 +450,7 @@ export default function EstimateTable({
               type="text"
               size="small"
               icon={<EditOutlined />}
-              onClick={(e) => {
+              onClick={e => {
                 e.stopPropagation()
                 setEditingCell({ id: record.id, field: 'workName' })
                 console.log('Edit clicked:', record.id)
@@ -360,7 +464,7 @@ export default function EstimateTable({
                 size="small"
                 icon={<CommentOutlined />}
                 style={{ color: '#1677ff' }}
-                onClick={(e) => e.stopPropagation()}
+                onClick={e => e.stopPropagation()}
               />
             </Tooltip>
           )}
@@ -370,7 +474,7 @@ export default function EstimateTable({
               size="small"
               icon={<DeleteOutlined />}
               danger
-              onClick={(e) => {
+              onClick={e => {
                 e.stopPropagation()
                 console.log('Delete button clicked for record:', record)
                 console.log('Calling onPositionDelete with id:', record.id)
@@ -385,7 +489,8 @@ export default function EstimateTable({
 
   const rowSelection = {
     selectedRowKeys: selectedPositions,
-    onChange: onSelectionChange,
+    onChange: (selectedRowKeys: React.Key[]) =>
+      onSelectionChange(selectedRowKeys as string[]),
     getCheckboxProps: (record: EstimatePosition) => ({
       name: record.workName,
     }),
@@ -418,18 +523,12 @@ export default function EstimateTable({
         sticky
         scroll={{
           x: 1800,
-          y: 'calc(100vh - 400px)'
+          y: 'calc(100vh - 400px)',
         }}
         rowSelection={rowSelection}
-        pagination={{
-          showSizeChanger: true,
-          showQuickJumper: true,
-          showTotal: (total, range) =>
-            `${range[0]}-${range[1]} из ${total} позиций`,
-          pageSizeOptions: ['20', '50', '100', '200']
-        }}
+        pagination={false}
         size="small"
-        rowClassName={(record) => {
+        rowClassName={record => {
           let className = ''
           if (selectedPositions.includes(record.id)) {
             className += 'estimate-row-selected '
@@ -450,11 +549,15 @@ export default function EstimateTable({
           }
           return className.trim()
         }}
-        onRow={(record) => ({
-          onClick: (e) => {
+        onRow={record => ({
+          onClick: e => {
             // Не обрабатываем клик, если это клик по кнопке или чекбоксу
             const target = e.target as globalThis.HTMLElement
-            if (target.closest('button') || target.closest('.ant-checkbox-wrapper') || target.closest('.ant-select')) {
+            if (
+              target.closest('button') ||
+              target.closest('.ant-checkbox-wrapper') ||
+              target.closest('.ant-select')
+            ) {
               return
             }
 
@@ -462,35 +565,83 @@ export default function EstimateTable({
             // Переключаем выбор строки
             const isSelected = selectedPositions.includes(record.id)
             if (isSelected) {
-              onSelectionChange(selectedPositions.filter(id => id !== record.id))
+              onSelectionChange(
+                selectedPositions.filter(id => id !== record.id)
+              )
             } else {
               onSelectionChange([...selectedPositions, record.id])
             }
-          }
+          },
         })}
-        summary={(data) => {
+        summary={data => {
           const total = data.reduce((sum, item) => sum + (item.total || 0), 0)
-          const workTotal = data.filter(item => item.justification === 'раб').reduce((sum, item) => sum + (item.total || 0), 0)
-          const materialTotal = data.filter(item => item.justification === 'мат').reduce((sum, item) => sum + (item.total || 0), 0)
+          const workTotal = data
+            .filter(item => item.justification === 'раб')
+            .reduce((sum, item) => sum + (item.total || 0), 0)
+          const materialTotal = data
+            .filter(item => item.justification === 'мат')
+            .reduce((sum, item) => sum + (item.total || 0), 0)
 
           return (
             <Table.Summary fixed>
-              <Table.Summary.Row style={{ backgroundColor: '#f8f9fa', fontWeight: 'bold' }}>
+              {/* Итого работ */}
+              <Table.Summary.Row
+                style={{ backgroundColor: '#fff7ed', fontWeight: 500 }}
+              >
                 <Table.Summary.Cell index={0} colSpan={10}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Space>
-                      <CalculatorOutlined />
-                      <Text strong>Итого по смете:</Text>
-                    </Space>
-                    <Space size="large">
-                      <Text>Работы: {workTotal.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} руб.</Text>
-                      <Text>Материалы: {materialTotal.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} руб.</Text>
-                    </Space>
-                  </div>
+                  <Text strong>Итого работ:</Text>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={11}>
+                  <Text strong style={{ color: '#f97316' }}>
+                    {workTotal.toLocaleString('ru-RU', {
+                      minimumFractionDigits: 2,
+                    })}{' '}
+                    руб.
+                  </Text>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={12} />
+              </Table.Summary.Row>
+
+              {/* Итого материалов */}
+              <Table.Summary.Row
+                style={{ backgroundColor: '#eff6ff', fontWeight: 500 }}
+              >
+                <Table.Summary.Cell index={0} colSpan={10}>
+                  <Text strong>Итого материалов:</Text>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={11}>
+                  <Text strong style={{ color: '#3b82f6' }}>
+                    {materialTotal.toLocaleString('ru-RU', {
+                      minimumFractionDigits: 2,
+                    })}{' '}
+                    руб.
+                  </Text>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={12} />
+              </Table.Summary.Row>
+
+              {/* Всего по смете */}
+              <Table.Summary.Row
+                style={{
+                  backgroundColor: '#f0fdf4',
+                  fontWeight: 'bold',
+                  fontSize: '16px',
+                }}
+              >
+                <Table.Summary.Cell index={0} colSpan={10}>
+                  <Space>
+                    <CalculatorOutlined style={{ color: '#16a34a' }} />
+                    <Text strong style={{ fontSize: '16px' }}>
+                      Всего по смете:
+                    </Text>
+                  </Space>
                 </Table.Summary.Cell>
                 <Table.Summary.Cell index={11}>
                   <Text strong style={{ color: '#16a34a', fontSize: '16px' }}>
-                    {total.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} руб.
+                    {total.toLocaleString('ru-RU', {
+                      minimumFractionDigits: 2,
+                    })}{' '}
+                    руб.
                   </Text>
                 </Table.Summary.Cell>
                 <Table.Summary.Cell index={12} />

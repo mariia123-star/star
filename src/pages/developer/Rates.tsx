@@ -35,17 +35,23 @@ import {
   DownOutlined,
 } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ratesApi, RateUpdate, RateWithUnit, rateMaterialsApi, RateMaterial } from '@/entities/rates'
+import {
+  ratesApi,
+  RateUpdate,
+  RateWithUnit,
+  rateMaterialsApi,
+  RateMaterial,
+} from '@/entities/rates'
 import { unitsApi, Unit } from '@/entities/units'
 import { materialsApi, MaterialWithUnit } from '@/entities/materials'
 import { supabase } from '@/lib/supabase'
 import { RateGroup, RatePosition, RATE_COLORS } from '@/shared/types/estimate'
 import AddRateModal from '@/widgets/estimate/AddRateModal'
 import { usePortalLogger } from '@/shared/hooks/usePortalLogger'
+import { generateRateCode } from '@/shared/utils/codeGenerator'
 
 const { Title, Text } = Typography
 const { Search } = Input
-
 
 interface RateFormData {
   code: string
@@ -70,7 +76,6 @@ interface MaterialFormData {
   is_active: boolean
 }
 
-
 // Функция преобразования расценок из БД в формат RateGroup
 const convertRatesToGroups = (
   rates: RateWithUnit[],
@@ -91,7 +96,7 @@ const convertRatesToGroups = (
       materialPrice: 0,
       deliveryPrice: 0,
       total: rate.base_price,
-      groupId: rateId
+      groupId: rateId,
     }
 
     // Создаем работы (одну позицию работ)
@@ -106,35 +111,41 @@ const convertRatesToGroups = (
       materialPrice: 0,
       deliveryPrice: 0,
       total: rate.base_price,
-      groupId: rateId
+      groupId: rateId,
     }
 
     // Создаем материалы
     const rateMaterials = allRateMaterials[rateId] || []
-    const materials: RatePosition[] = rateMaterials.map((rateMaterial, index) => {
-      const volume = rateMaterial.consumption || 1
-      const consumptionRate = rateMaterial.consumption || 1
-      const materialPrice = rateMaterial.unit_price || 0
-      const deliveryPrice = 0 // TODO: добавить поле доставки в БД
+    const materials: RatePosition[] = rateMaterials.map(
+      (rateMaterial, index) => {
+        const volume = rateMaterial.consumption || 1
+        const consumptionRate = rateMaterial.consumption || 1
+        const materialPrice = rateMaterial.unit_price || 0
+        const deliveryPrice = 0 // TODO: добавить поле доставки в БД
 
-      // Правильная формула: объем * расход * стоимость + доставка
-      const materialTotal = volume * consumptionRate * materialPrice + deliveryPrice
+        // Правильная формула: объем * расход * стоимость + доставка
+        const materialTotal =
+          volume * consumptionRate * materialPrice + deliveryPrice
 
-      return {
-        id: `material-${rateId}-${index}`,
-        type: 'мат',
-        materialType: rateMaterial.material?.category === 'material' ? 'Основной' : 'Вспом',
-        name: rateMaterial.material?.name || 'Материал',
-        unit: rateMaterial.material?.unit_short_name || 'ед',
-        volume: volume,
-        consumptionRate: consumptionRate,
-        workPrice: 0,
-        materialPrice: materialPrice,
-        deliveryPrice: deliveryPrice,
-        total: materialTotal,
-        groupId: rateId
+        return {
+          id: `material-${rateId}-${index}`,
+          type: 'мат',
+          materialType:
+            rateMaterial.material?.category === 'material'
+              ? 'Основной'
+              : 'Вспом',
+          name: rateMaterial.material?.name || 'Материал',
+          unit: rateMaterial.material?.unit_short_name || 'ед',
+          volume: volume,
+          consumptionRate: consumptionRate,
+          workPrice: 0,
+          materialPrice: materialPrice,
+          deliveryPrice: deliveryPrice,
+          total: materialTotal,
+          groupId: rateId,
+        }
       }
-    })
+    )
 
     // Подсчет общей стоимости: работа + сумма всех материалов
     const worksCost = rate.base_price || 0
@@ -151,7 +162,7 @@ const convertRatesToGroups = (
       works: [work],
       materials,
       totalSum,
-      isExpanded: false
+      isExpanded: false,
     }
   })
 }
@@ -192,7 +203,8 @@ function Rates() {
   const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false)
   const [isAddModalVisible, setIsAddModalVisible] = useState(false)
   const [editingRate, setEditingRate] = useState<RateWithUnit | null>(null)
-  const [selectedRateForMaterial, setSelectedRateForMaterial] = useState<RateWithUnit | null>(null)
+  const [selectedRateForMaterial, setSelectedRateForMaterial] =
+    useState<RateWithUnit | null>(null)
   const [form] = Form.useForm<RateFormData>()
   const [materialForm] = Form.useForm<MaterialFormData>()
   const [searchText, setSearchText] = useState('')
@@ -203,7 +215,11 @@ function Rates() {
   const queryClient = useQueryClient()
   const logger = usePortalLogger()
 
-  const { data: rates = [], isLoading, refetch: refetchRates } = useQuery({
+  const {
+    data: rates = [],
+    isLoading,
+    refetch: refetchRates,
+  } = useQuery({
     queryKey: ['rates'],
     queryFn: ratesApi.getAll,
   })
@@ -219,99 +235,89 @@ function Rates() {
   })
 
   // Запрос всех материалов расценок для построения иерархии (оптимизированный)
-  const { data: allRateMaterials = {}, isLoading: rateMaterialsLoading, refetch: refetchRateMaterials } = useQuery({
+  const {
+    data: rawRateMaterials = [],
+    isLoading: rateMaterialsLoading,
+    refetch: refetchRateMaterials,
+  } = useQuery({
     queryKey: ['rateMaterials', 'all'],
     queryFn: async () => {
       // Получаем все связи материалов с расценками за один запрос
       const { data, error } = await supabase
         .from('rate_materials_mapping')
-        .select(`
-          *,
-          material:materials (
-            id,
-            code,
-            name,
-            description,
-            unit_id,
-            unit_name,
-            unit_short_name,
-            last_purchase_price,
-            supplier,
-            supplier_article,
-            is_active
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: true })
 
       console.log('Optimized rate materials query:', {
-        action: 'load_all_rate_materials_optimized', 
+        action: 'load_all_rate_materials_optimized',
         timestamp: new Date().toISOString(),
         success: !error,
         dataCount: data?.length || 0,
         error: error?.message,
-        data: data
       })
 
       if (error) {
         console.error('Get all rate materials error:', error)
         throw error
       }
-      
-      // Группируем результаты по rate_id
-      const grouped: Record<string, RateMaterial[]> = {}
-      if (data) {
-        data.forEach((rateMaterial) => {
-          if (!grouped[rateMaterial.rate_id]) {
-            grouped[rateMaterial.rate_id] = []
-          }
-          grouped[rateMaterial.rate_id].push(rateMaterial)
-        })
-      }
-      
-      console.log('All rate materials grouped:', {
-        action: 'group_rate_materials',
-        timestamp: new Date().toISOString(),
-        totalMaterials: data?.length || 0,
-        groupedRatesCount: Object.keys(grouped).length,
-        grouped
-      })
-      
-      return grouped
+
+      return data || []
     },
-    enabled: true, // Выполняем запрос независимо от rates, так как это один оптимизированный запрос
+    enabled: true,
   })
 
-  console.log('Rates page rendered', {
-    action: 'page_render',
-    timestamp: new Date().toISOString(),
-    ratesCount: rates.length,
-    unitsCount: units.length,
-    isLoading,
-    unitsLoading,
-  })
+  // Мемоизируем группировку материалов чтобы избежать бесконечных ререндеров
+  const allRateMaterials = React.useMemo(() => {
+    const grouped: Record<string, RateMaterial[]> = {}
+
+    // Проверяем что rawRateMaterials это массив
+    if (!Array.isArray(rawRateMaterials)) {
+      console.warn('rawRateMaterials is not an array:', rawRateMaterials)
+      return grouped
+    }
+
+    rawRateMaterials.forEach(rateMaterial => {
+      if (!grouped[rateMaterial.rate_id]) {
+        grouped[rateMaterial.rate_id] = []
+      }
+      grouped[rateMaterial.rate_id].push(rateMaterial)
+    })
+    return grouped
+  }, [rawRateMaterials])
 
   // Преобразуем данные из БД в формат RateGroup при изменении данных
+  // Конвертация расценок в группы
   React.useEffect(() => {
     if (rates.length > 0 && !rateMaterialsLoading) {
       const groups = convertRatesToGroups(rates, allRateMaterials)
-      setRateGroups(groups)
-      console.log('Rate groups converted:', {
-        ratesCount: rates.length,
-        groupsCount: groups.length,
-        materialsCount: Object.keys(allRateMaterials).length
-      })
 
-      // Логируем загрузку данных страницы
-      logger.logView('rates', undefined, `Загружена страница сборника расценок с ${rates.length} расценками`)
+      setRateGroups(prevGroups => {
+        // Проверяем, действительно ли данные изменились
+        if (JSON.stringify(prevGroups) === JSON.stringify(groups)) {
+          return prevGroups
+        }
+
+        console.log('Rate groups converted:', {
+          ratesCount: rates.length,
+          groupsCount: groups.length,
+          materialsCount: Object.keys(allRateMaterials).length,
+        })
+        return groups
+      })
     }
   }, [rates, allRateMaterials, rateMaterialsLoading])
 
-  // Проверка что данные из БД загружаются
-  console.log('Rate materials from database:', {
-    allRateMaterialsKeys: Object.keys(allRateMaterials),
-    allRateMaterialsValues: allRateMaterials,
-    loading: rateMaterialsLoading
-  })
+  // Логирование загрузки страницы (только один раз при монтировании)
+  React.useEffect(() => {
+    if (rates.length > 0) {
+      logger.logView(
+        'rates',
+        undefined,
+        `Загружена страница сборника расценок с ${rates.length} расценками`
+      )
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Проверка существования таблицы rate_materials_mapping
   React.useEffect(() => {
@@ -321,84 +327,286 @@ function Rates() {
           .from('rate_materials_mapping')
           .select('id')
           .limit(1)
-        
+
         console.log('Table rate_materials_mapping check:', {
           exists: !error,
           error: error?.message,
-          data: data
+          data: data,
         })
-        
+
         if (error) {
-          console.error('⚠️  КРИТИЧЕСКАЯ ОШИБКА: Таблица rate_materials_mapping не существует!')
+          console.error(
+            '⚠️  КРИТИЧЕСКАЯ ОШИБКА: Таблица rate_materials_mapping не существует!'
+          )
           console.error('Выполните SQL миграцию в Supabase Dashboard!')
         }
       } catch (err) {
         console.error('Database connection error:', err)
       }
     }
-    
+
     checkTable()
   }, [])
+
+  // Функция для автоматического создания материала из подкатегории
+  const handleSubcategoryMaterial = async (
+    rateData: any,
+    rateId: string
+  ): Promise<void> => {
+    if (!rateData.subcategory || !rateId) {
+      console.log('Нет подкатегории или rateId, пропускаем создание материала')
+      return
+    }
+
+    const subcategoryName = rateData.subcategory.trim()
+    if (!subcategoryName) return
+
+    console.log('🔵 Обработка подкатегории как материала:', {
+      subcategory: subcategoryName,
+      rateId,
+      timestamp: new Date().toISOString(),
+    })
+
+    try {
+      // Ищем материал с таким названием в справочнике
+      let material = materials.find(
+        m => m.name.toLowerCase().trim() === subcategoryName.toLowerCase()
+      )
+
+      if (!material) {
+        // Материал не найден - создаем его
+        console.log(
+          '🔵 Материал не найден в справочнике, создаем новый:',
+          subcategoryName
+        )
+
+        // Находим unit_id - используем тот же что у расценки
+        const unitId =
+          rateData.unit_id || units.find(u => u.short_name === 'шт')?.id
+
+        if (!unitId) {
+          console.error('Не найдена единица измерения для создания материала')
+          message.warning(
+            'Не удалось создать материал: не найдена единица измерения'
+          )
+          return
+        }
+
+        // Генерируем код материала
+        const code = `MAT-${Date.now().toString().slice(-6)}`
+
+        // Создаем материал в справочнике
+        material = await materialsApi.create({
+          code,
+          name: subcategoryName,
+          description: `Автоматически создан из расценки "${rateData.name}"`,
+          category: 'other',
+          unit_id: unitId,
+          last_purchase_price: rateData.base_price || 0,
+          is_active: true,
+        })
+
+        console.log('✅ Материал успешно создан в справочнике:', {
+          materialId: material.id,
+          materialName: material.name,
+          materialCode: material.code,
+          timestamp: new Date().toISOString(),
+        })
+
+        message.success(
+          `Материал "${subcategoryName}" автоматически добавлен в справочник материалов`
+        )
+      } else {
+        console.log('✅ Материал найден в справочнике:', {
+          materialId: material.id,
+          materialName: material.name,
+          timestamp: new Date().toISOString(),
+        })
+      }
+
+      // Проверяем, не существует ли уже связь
+      const existingMaterials = await rateMaterialsApi.getByRateId(rateId)
+      const alreadyLinked = existingMaterials.some(
+        rm => rm.material_id === material!.id
+      )
+
+      if (alreadyLinked) {
+        console.log('⚠️  Материал уже связан с расценкой, пропускаем')
+        return
+      }
+
+      // Создаем связь между расценкой и материалом
+      await rateMaterialsApi.create({
+        rate_id: rateId,
+        material_id: material.id,
+        consumption: 1,
+        unit_price: material.last_purchase_price || 0,
+        notes: `Автоматически связан через подкатегорию "${subcategoryName}"`,
+      })
+
+      console.log('✅ Связь между расценкой и материалом создана:', {
+        rateId,
+        materialId: material.id,
+        materialName: material.name,
+        timestamp: new Date().toISOString(),
+      })
+
+      message.success(
+        `Материал "${subcategoryName}" добавлен в расценку и справочник`
+      )
+    } catch (error) {
+      console.error(
+        '❌ Ошибка при обработке подкатегории как материала:',
+        error
+      )
+      message.error(
+        `Не удалось создать связь с материалом "${subcategoryName}"`
+      )
+    }
+  }
 
   const createMutation = useMutation({
     mutationFn: ratesApi.create,
     onSuccess: async data => {
-      console.log('Rate created successfully:', data)
-      console.log('tempRateMaterials at creation:', {
+      console.log('✅ Rate created successfully:', data)
+      console.log('🔵 tempRateMaterials at creation:', {
         length: tempRateMaterials.length,
         materials: tempRateMaterials,
-        hasDataId: !!data.id
+        hasDataId: !!data.id,
       })
+
+      // Обрабатываем подкатегорию как материал
+      await handleSubcategoryMaterial(data, data.id)
 
       // Связываем материалы с новой расценкой в базе данных
       if (tempRateMaterials.length > 0 && data.id) {
+        console.log(
+          '🔵 Will save materials because tempRateMaterials.length > 0 and data.id exists'
+        )
         try {
-          const rateMaterialsToCreate = tempRateMaterials.map(material => {
-            const materialId = material.id.startsWith('catalog-') 
-              ? (material as any).originalId || material.id.replace('catalog-', '')
-              : material.id
+          const rateMaterialsToCreate = tempRateMaterials
+            .map((material, index) => {
+              // Извлекаем реальный materialId
+              let materialId = material.id
 
-            return {
-              rate_id: data.id,
-              material_id: materialId,
-              consumption: material.consumption || 1,
-              unit_price: material.last_purchase_price || 0,
-              notes: `Материал добавлен при создании расценки`
+              if (material.id.startsWith('catalog-')) {
+                materialId =
+                  (material as any).originalId ||
+                  material.id.replace('catalog-', '')
+              } else if (material.id.startsWith('temp-')) {
+                // ВАЖНО: Пропускаем материалы с временными ID
+                // Они должны были быть созданы через handleSubcategoryMaterial
+                console.warn(
+                  '⚠️  Пропуск материала с временным ID (должен быть обработан через подкатегорию):',
+                  {
+                    materialId: material.id,
+                    materialName: material.name,
+                  }
+                )
+                return null // Вернем null, чтобы отфильтровать позже
+              }
+
+              console.log(
+                `🔵 Обработка материала ${index + 1}/${tempRateMaterials.length}:`,
+                {
+                  originalMaterial: {
+                    id: material.id,
+                    originalId: (material as any).originalId,
+                    code: material.code,
+                    name: material.name,
+                    consumption: material.consumption,
+                    price: material.last_purchase_price,
+                  },
+                  extractedMaterialId: materialId,
+                }
+              )
+
+              return {
+                rate_id: data.id,
+                material_id: materialId,
+                consumption: material.consumption || 1,
+                unit_price: material.last_purchase_price || 0,
+                notes: `Материал добавлен при создании расценки`,
+              }
+            })
+            .filter(item => item !== null) // Убираем null значения
+
+          // Фильтруем дубликаты по material_id
+          const uniqueMaterialIds = new Set<string>()
+          const uniqueRateMaterials = rateMaterialsToCreate.filter(item => {
+            if (uniqueMaterialIds.has(item.material_id)) {
+              console.log('⚠️ Найден дубликат material_id, пропускаем:', {
+                materialId: item.material_id,
+                rateId: item.rate_id,
+              })
+              return false
             }
+            uniqueMaterialIds.add(item.material_id)
+            return true
           })
 
           // Сохраняем материалы в базу данных
-          console.log('Attempting to save materials to database:', {
+          console.log('🔵 Попытка сохранить материалы в БД:', {
             rateId: data.id,
-            materialsCount: rateMaterialsToCreate.length,
-            materials: rateMaterialsToCreate
+            totalMaterials: rateMaterialsToCreate.length,
+            uniqueMaterials: uniqueRateMaterials.length,
+            duplicatesRemoved:
+              rateMaterialsToCreate.length - uniqueRateMaterials.length,
+            materials: uniqueRateMaterials,
           })
-          
-          const savedMaterials = await rateMaterialsApi.createMany(rateMaterialsToCreate)
-          
-          console.log('✅ Materials saved to database successfully:', {
+
+          if (uniqueRateMaterials.length !== rateMaterialsToCreate.length) {
+            message.warning(
+              `Обнаружено и удалено ${rateMaterialsToCreate.length - uniqueRateMaterials.length} дубликатов материалов`
+            )
+          }
+
+          const savedMaterials =
+            await rateMaterialsApi.createMany(uniqueRateMaterials)
+
+          console.log('✅ Материалы успешно сохранены в БД:', {
             rateId: data.id,
-            materialsCount: rateMaterialsToCreate.length,
-            savedMaterials: savedMaterials
+            materialsCount: uniqueRateMaterials.length,
+            savedMaterials: savedMaterials,
           })
-          
+
           // Очищаем временные материалы
           setTempRateMaterials([])
-          
+
           // Автоматически раскрываем новую расценку
-          setTimeout(() => {
+          window.setTimeout(() => {
             setExpandedRates(prev => new Set([...prev, data.id]))
           }, 100)
-          
         } catch (materialError) {
-          console.error('Error saving materials to database:', materialError)
-          message.warning('Расценка создана, но возникла ошибка при сохранении материалов')
+          console.error('❌ Error saving materials to database:', {
+            error: materialError,
+            message: materialError?.message,
+            details: materialError?.details,
+            hint: materialError?.hint,
+            code: materialError?.code,
+            rateId: data.id,
+            materialsCount: tempRateMaterials.length,
+          })
+          message.warning(
+            'Расценка создана, но возникла ошибка при сохранении материалов'
+          )
         }
+      } else {
+        console.log('⚠️  Skipping material save:', {
+          reason:
+            tempRateMaterials.length === 0
+              ? 'No materials to save'
+              : 'Missing rate ID',
+          tempRateMaterialsLength: tempRateMaterials.length,
+          hasDataId: !!data.id,
+        })
       }
-      
+
       // Обновляем кэш и перезагружаем данные
       await queryClient.invalidateQueries({ queryKey: ['rates'] })
-      await queryClient.invalidateQueries({ queryKey: ['rateMaterials', 'all'] })
+      await queryClient.invalidateQueries({
+        queryKey: ['rateMaterials', 'all'],
+      })
 
       console.log('✅ Cache invalidated, queries will reload')
 
@@ -433,48 +641,101 @@ function Rates() {
       ratesApi.update(id, data),
     onSuccess: async (data, variables) => {
       console.log('Rate updated successfully:', data)
-      
+
+      // Обрабатываем подкатегорию как материал при обновлении
+      await handleSubcategoryMaterial(variables.data, variables.id)
+
       // Обновляем материалы расценки
       if (tempRateMaterials.length > 0 && variables.id) {
         try {
           // Удаляем все старые материалы расценки
           await rateMaterialsApi.deleteByRateId(variables.id)
           console.log('Old materials deleted for rate:', variables.id)
-          
-          // Создаем новые материалы
-          const rateMaterialsToCreate = tempRateMaterials.map(material => {
-            const materialId = material.id.startsWith('catalog-') 
-              ? (material as any).originalId || material.id.replace('catalog-', '')
-              : (material as any).originalId || material.id
 
-            return {
-              rate_id: variables.id,
-              material_id: materialId,
-              consumption: material.consumption || 1,
-              unit_price: material.last_purchase_price || 0,
-              notes: `Материал обновлен при редактировании расценки`
+          // Создаем новые материалы
+          const rateMaterialsToCreate = tempRateMaterials
+            .map(material => {
+              // Извлекаем реальный materialId
+              let materialId = material.id
+
+              if (material.id.startsWith('catalog-')) {
+                materialId =
+                  (material as any).originalId ||
+                  material.id.replace('catalog-', '')
+              } else if (material.id.startsWith('temp-')) {
+                // ВАЖНО: Пропускаем материалы с временными ID
+                // Они должны были быть созданы через handleSubcategoryMaterial
+                console.warn(
+                  '⚠️  Пропуск материала с временным ID при обновлении (должен быть обработан через подкатегорию):',
+                  {
+                    materialId: material.id,
+                    materialName: material.name,
+                  }
+                )
+                return null // Вернем null, чтобы отфильтровать позже
+              } else {
+                // Для остальных случаев пытаемся использовать originalId
+                materialId = (material as any).originalId || material.id
+              }
+
+              return {
+                rate_id: variables.id,
+                material_id: materialId,
+                consumption: material.consumption || 1,
+                unit_price: material.last_purchase_price || 0,
+                notes: `Материал обновлен при редактировании расценки`,
+              }
+            })
+            .filter(item => item !== null) // Убираем null значения
+
+          // Фильтруем дубликаты по material_id
+          const uniqueMaterialIds = new Set<string>()
+          const uniqueRateMaterials = rateMaterialsToCreate.filter(item => {
+            if (uniqueMaterialIds.has(item.material_id)) {
+              console.log(
+                '⚠️ Найден дубликат material_id при обновлении, пропускаем:',
+                {
+                  materialId: item.material_id,
+                  rateId: item.rate_id,
+                }
+              )
+              return false
             }
+            uniqueMaterialIds.add(item.material_id)
+            return true
           })
-          
-          console.log('Updating rate materials:', {
+
+          console.log('Обновление материалов расценки:', {
             rateId: variables.id,
-            materialsCount: rateMaterialsToCreate.length,
-            materials: rateMaterialsToCreate
+            totalMaterials: rateMaterialsToCreate.length,
+            uniqueMaterials: uniqueRateMaterials.length,
+            duplicatesRemoved:
+              rateMaterialsToCreate.length - uniqueRateMaterials.length,
+            materials: uniqueRateMaterials,
           })
-          
-          await rateMaterialsApi.createMany(rateMaterialsToCreate)
-          console.log('✅ Rate materials updated successfully')
-          
+
+          if (uniqueRateMaterials.length !== rateMaterialsToCreate.length) {
+            message.warning(
+              `Обнаружено и удалено ${rateMaterialsToCreate.length - uniqueRateMaterials.length} дубликатов материалов`
+            )
+          }
+
+          await rateMaterialsApi.createMany(uniqueRateMaterials)
+          console.log('✅ Материалы расценки успешно обновлены')
         } catch (materialError) {
           console.error('Error updating rate materials:', materialError)
-          message.warning('Расценка обновлена, но возникла ошибка при сохранении материалов')
+          message.warning(
+            'Расценка обновлена, но возникла ошибка при сохранении материалов'
+          )
         }
       }
-      
+
       // Обновляем кэш
       await queryClient.invalidateQueries({ queryKey: ['rates'] })
-      await queryClient.invalidateQueries({ queryKey: ['rateMaterials', 'all'] })
-      
+      await queryClient.invalidateQueries({
+        queryKey: ['rateMaterials', 'all'],
+      })
+
       message.success('Расценка и материалы успешно обновлены')
       handleCloseModal()
     },
@@ -532,10 +793,17 @@ function Rates() {
 
     setEditingRate(null)
     form.resetFields()
+
+    const defaultCategory = 'общестроительные_работы'
+    // Генерируем код автоматически
+    const existingCodes = rates.map(r => r.code)
+    const generatedCode = generateRateCode(defaultCategory, existingCodes)
+
     form.setFieldsValue({
       is_active: true,
-      category: 'общестроительные_работы',
+      category: defaultCategory,
       base_price: 0,
+      code: generatedCode,
     })
     setTempRateMaterials([])
     setActiveTab('1')
@@ -546,7 +814,7 @@ function Rates() {
   const addTempMaterial = () => {
     // Используем первую доступную единицу измерения по умолчанию
     const defaultUnit = units[0]
-    
+
     const newMaterial: MaterialWithUnit & { consumption?: number } = {
       id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       code: `МТ-${String(tempRateMaterials.length + 1).padStart(3, '0')}`,
@@ -566,29 +834,61 @@ function Rates() {
     }
     setTempRateMaterials(prev => {
       const updated = [...prev, newMaterial]
-      console.log('Material added to temp list:', { newMaterial, totalCount: updated.length })
+      console.log('Material added to temp list:', {
+        newMaterial,
+        totalCount: updated.length,
+      })
       return updated
     })
   }
 
   const addMaterialFromCatalog = (selectedMaterialId: string) => {
-    const selectedMaterial = materials.find(m => m.id === selectedMaterialId)
-    if (!selectedMaterial) return
+    console.log('addMaterialFromCatalog called with ID:', selectedMaterialId)
 
-    // Проверяем, не добавлен ли уже этот материал
-    const isAlreadyAdded = tempRateMaterials.some(m => 
-      (m.id === `catalog-${selectedMaterial.id}`) || 
-      ((m as any).originalId === selectedMaterial.id) ||
-      (m.code === selectedMaterial.code && m.name === selectedMaterial.name)
-    )
-    
-    if (isAlreadyAdded) {
-      message.warning('Материал уже добавлен в список')
+    const selectedMaterial = materials.find(m => m.id === selectedMaterialId)
+    if (!selectedMaterial) {
+      console.error('Material not found:', selectedMaterialId)
+      message.error('Материал не найден')
       return
     }
 
+    // Проверяем, не добавлен ли уже этот материал (по originalId)
+    const isAlreadyAdded = tempRateMaterials.some(m => {
+      const existingMaterialId = m.id.startsWith('catalog-')
+        ? (m as any).originalId || m.id.replace('catalog-', '')
+        : m.id.startsWith('temp-')
+          ? null
+          : m.id
+
+      return existingMaterialId === selectedMaterial.id
+    })
+
+    if (isAlreadyAdded) {
+      console.log('❌ Попытка добавить дубликат материала:', {
+        materialId: selectedMaterial.id,
+        code: selectedMaterial.code,
+        name: selectedMaterial.name,
+        timestamp: new Date().toISOString(),
+      })
+      message.warning(
+        `Материал "${selectedMaterial.code} - ${selectedMaterial.name}" уже добавлен в расценку`
+      )
+      setSelectedCatalogMaterial(undefined) // Сбрасываем выбор
+      return
+    }
+
+    console.log('✅ Добавление материала из справочника:', {
+      materialId: selectedMaterial.id,
+      code: selectedMaterial.code,
+      name: selectedMaterial.name,
+      timestamp: new Date().toISOString(),
+    })
+
     // Добавляем материал из справочника с меткой
-    const materialFromCatalog: MaterialWithUnit & { consumption?: number; originalId?: string } = {
+    const materialFromCatalog: MaterialWithUnit & {
+      consumption?: number
+      originalId?: string
+    } = {
       ...selectedMaterial,
       id: `catalog-${selectedMaterial.id}`, // Метка что это материал из справочника
       originalId: selectedMaterial.id, // Сохраняем оригинальный ID
@@ -598,29 +898,41 @@ function Rates() {
       unit_name: selectedMaterial.unit_name,
       unit_short_name: selectedMaterial.unit_short_name,
     }
-    
+
     setTempRateMaterials(prev => {
       const updated = [...prev, materialFromCatalog]
-      console.log('Material from catalog added to temp list:', { 
-        materialFromCatalog, 
+      console.log('Material from catalog added to temp list:', {
+        materialFromCatalog,
         totalCount: updated.length,
-        selectedMaterial: selectedMaterial.name 
+        selectedMaterial: selectedMaterial.name,
       })
       return updated
     })
+
     message.success(`Материал "${selectedMaterial.name}" добавлен`)
+    setSelectedCatalogMaterial(undefined) // Сбрасываем выбор после добавления
   }
 
   const removeTempMaterial = (materialId: string) => {
     setTempRateMaterials(prev => prev.filter(m => m.id !== materialId))
   }
 
-  const updateTempMaterial = (materialId: string, field: string, value: any) => {
-    setTempRateMaterials(prev => prev.map(material => 
-      material.id === materialId 
-        ? { ...material, [field]: value, updated_at: new Date().toISOString() }
-        : material
-    ))
+  const updateTempMaterial = (
+    materialId: string,
+    field: string,
+    value: any
+  ) => {
+    setTempRateMaterials(prev =>
+      prev.map(material =>
+        material.id === materialId
+          ? {
+              ...material,
+              [field]: value,
+              updated_at: new Date().toISOString(),
+            }
+          : material
+      )
+    )
   }
 
   const handleEdit = async (rate: RateWithUnit) => {
@@ -633,16 +945,16 @@ function Rates() {
 
     setEditingRate(rate)
     form.setFieldsValue(rate)
-    
+
     // Загружаем существующие материалы расценки
     try {
       const rateMaterials = await rateMaterialsApi.getByRateId(rate.id)
       console.log('Loaded materials for editing rate:', {
         rateId: rate.id,
         materialsCount: rateMaterials.length,
-        materials: rateMaterials
+        materials: rateMaterials,
       })
-      
+
       // Преобразуем материалы в формат для редактирования
       const tempMaterials = rateMaterials.map(rateMaterial => ({
         id: rateMaterial.material?.id || rateMaterial.material_id,
@@ -661,17 +973,16 @@ function Rates() {
         updated_at: rateMaterial.updated_at,
         consumption: rateMaterial.consumption,
         originalId: rateMaterial.material?.id || rateMaterial.material_id,
-        rateMaterialId: rateMaterial.id // Для обновления
+        rateMaterialId: rateMaterial.id, // Для обновления
       }))
-      
+
       setTempRateMaterials(tempMaterials)
       setActiveTab('1') // Открываем на первой вкладке
-      
     } catch (error) {
       console.error('Error loading materials for rate editing:', error)
       setTempRateMaterials([]) // Очищаем если ошибка
     }
-    
+
     setIsModalOpen(true)
   }
 
@@ -695,7 +1006,7 @@ function Rates() {
       // Логируем открытие формы редактирования
       logger.logButtonClick('Изменить расценку', 'Сборник расценок', {
         rateId: groupId,
-        rateName: rate.name
+        rateName: rate.name,
       })
       console.log('Calling handleEdit with rate:', rate)
       handleEdit(rate)
@@ -710,7 +1021,7 @@ function Rates() {
     // Логируем удаление расценки
     logger.logButtonClick('Удалить расценку', 'Сборник расценок', {
       rateId: groupId,
-      rateName: rate?.name || 'Неизвестно'
+      rateName: rate?.name || 'Неизвестно',
     })
     handleDelete(groupId)
   }
@@ -721,7 +1032,7 @@ function Rates() {
       // Логируем дублирование расценки
       logger.logButtonClick('Дублировать расценку', 'Сборник расценок', {
         originalRateId: groupId,
-        originalRateName: rate.name
+        originalRateName: rate.name,
       })
 
       // Создаем дубликат расценки
@@ -733,32 +1044,41 @@ function Rates() {
         base_price: rate.base_price,
         category: rate.category,
         subcategory: rate.subcategory,
-        is_active: rate.is_active
+        is_active: rate.is_active,
       }
 
       createMutation.mutate(duplicateData)
       message.success('Расценка дублирована')
 
       // Логируем создание новой расценки
-      logger.logCreate('rates', 'new-duplicate', duplicateData, `Создана копия расценки "${rate.name}"`)
+      logger.logCreate(
+        'rates',
+        'new-duplicate',
+        duplicateData,
+        `Создана копия расценки "${rate.name}"`
+      )
     }
   }
 
-  const handleUpdateGroupPosition = async (positionId: string, updates: Partial<RatePosition>) => {
+  const handleUpdateGroupPosition = async (
+    positionId: string,
+    updates: Partial<RatePosition>
+  ) => {
     console.log('Position update requested:', { positionId, updates })
 
     // Логируем действие пользователя
     logger.logButtonClick('Редактирование поля расценки', 'Сборник расценок', {
       positionId,
       updates,
-      action: 'inline_edit'
+      action: 'inline_edit',
     })
 
     // Найдем группу, которая содержит эту позицию
-    const group = rateGroups.find(g =>
-      g.contractor.id === positionId ||
-      g.works.some(w => w.id === positionId) ||
-      g.materials.some(m => m.id === positionId)
+    const group = rateGroups.find(
+      g =>
+        g.contractor.id === positionId ||
+        g.works.some(w => w.id === positionId) ||
+        g.materials.some(m => m.id === positionId)
     )
 
     if (!group) {
@@ -774,7 +1094,10 @@ function Rates() {
 
     try {
       // Если обновляется основная позиция (заказчик или работа), обновляем расценку в БД
-      if (positionId === group.contractor.id || positionId === group.works[0]?.id) {
+      if (
+        positionId === group.contractor.id ||
+        positionId === group.works[0]?.id
+      ) {
         const updateData: Partial<RateUpdate> = {}
 
         if (updates.name) {
@@ -794,7 +1117,7 @@ function Rates() {
         if (Object.keys(updateData).length > 0) {
           await updateMutation.mutateAsync({
             id: group.id,
-            data: updateData
+            data: updateData,
           })
 
           // Обновляем кэш данных
@@ -813,15 +1136,20 @@ function Rates() {
             const updateData = {
               consumption: updates.consumptionRate || updates.volume,
               unit_price: updates.materialPrice,
-              notes: `Обновлено через интерфейс: ${new Date().toLocaleString()}`
+              notes: `Обновлено через интерфейс: ${new Date().toLocaleString()}`,
             }
 
             // Обновляем запись в rate_materials_mapping
             await rateMaterialsApi.update(rateMaterialId, updateData)
-            console.log('📋 Material mapping updated:', { rateMaterialId, updateData })
+            console.log('📋 Material mapping updated:', {
+              rateMaterialId,
+              updateData,
+            })
 
             // Обновляем кэш материалов
-            await queryClient.invalidateQueries({ queryKey: ['rateMaterials', 'all'] })
+            await queryClient.invalidateQueries({
+              queryKey: ['rateMaterials', 'all'],
+            })
           }
         } catch (materialError) {
           console.error('Error updating material mapping:', materialError)
@@ -830,56 +1158,70 @@ function Rates() {
       }
 
       // Обновляем локальное состояние групп
-      setRateGroups(prev => prev.map(g => {
-        if (g.id !== group.id) return g
+      setRateGroups(prev =>
+        prev.map(g => {
+          if (g.id !== group.id) return g
 
-        const updatedGroup = { ...g }
+          const updatedGroup = { ...g }
 
-        // Обновляем заказчика
-        if (positionId === g.contractor.id) {
-          updatedGroup.contractor = { ...g.contractor, ...updates }
-        }
+          // Обновляем заказчика
+          if (positionId === g.contractor.id) {
+            updatedGroup.contractor = { ...g.contractor, ...updates }
+          }
 
-        // Обновляем работы
-        updatedGroup.works = g.works.map(work =>
-          work.id === positionId ? { ...work, ...updates } : work
-        )
+          // Обновляем работы
+          updatedGroup.works = g.works.map(work =>
+            work.id === positionId ? { ...work, ...updates } : work
+          )
 
-        // Обновляем материалы
-        updatedGroup.materials = g.materials.map(material =>
-          material.id === positionId ? { ...material, ...updates } : material
-        )
+          // Обновляем материалы
+          updatedGroup.materials = g.materials.map(material =>
+            material.id === positionId ? { ...material, ...updates } : material
+          )
 
-        // Пересчитываем общую стоимость
-        const worksCost = updatedGroup.works.reduce((sum, w) => sum + (w.volume * w.workPrice), 0)
-        const materialsCost = updatedGroup.materials.reduce((sum, m) => sum + (m.volume * m.materialPrice * m.consumptionRate), 0)
-        updatedGroup.totalSum = worksCost + materialsCost
+          // Пересчитываем общую стоимость
+          const worksCost = updatedGroup.works.reduce(
+            (sum, w) => sum + w.volume * w.workPrice,
+            0
+          )
+          const materialsCost = updatedGroup.materials.reduce(
+            (sum, m) => sum + m.volume * m.materialPrice * m.consumptionRate,
+            0
+          )
+          updatedGroup.totalSum = worksCost + materialsCost
 
-        // Обновляем total для каждой позиции
-        updatedGroup.works = updatedGroup.works.map(w => ({
-          ...w,
-          total: w.volume * w.workPrice
-        }))
+          // Обновляем total для каждой позиции
+          updatedGroup.works = updatedGroup.works.map(w => ({
+            ...w,
+            total: w.volume * w.workPrice,
+          }))
 
-        updatedGroup.materials = updatedGroup.materials.map(m => ({
-          ...m,
-          total: m.volume * m.materialPrice * m.consumptionRate + m.deliveryPrice
-        }))
+          updatedGroup.materials = updatedGroup.materials.map(m => ({
+            ...m,
+            total:
+              m.volume * m.materialPrice * m.consumptionRate + m.deliveryPrice,
+          }))
 
-        updatedGroup.contractor = {
-          ...updatedGroup.contractor,
-          total: updatedGroup.totalSum
-        }
+          updatedGroup.contractor = {
+            ...updatedGroup.contractor,
+            total: updatedGroup.totalSum,
+          }
 
-        return updatedGroup
-      }))
+          return updatedGroup
+        })
+      )
 
       message.success('Позиция обновлена')
       console.log('✅ Position updated successfully:', { positionId, updates })
 
       // Логируем успешное обновление в БД
-      logger.logUpdate('rates', group.id, {}, updates, `Обновлена позиция ${positionId} в расценке "${group.contractor.name}"`)
-
+      logger.logUpdate(
+        'rates',
+        group.id,
+        {},
+        updates,
+        `Обновлена позиция ${positionId} в расценке "${group.contractor.name}"`
+      )
     } catch (error) {
       console.error('Error updating position:', error)
       message.error(`Ошибка обновления: ${error}`)
@@ -906,11 +1248,16 @@ function Rates() {
     const rateData = {
       code: newGroup.contractor.name.replace(/\s+/g, '-').toUpperCase(),
       name: newGroup.contractor.name,
-      description: newGroup.works[0]?.name ? `Включает работы: ${newGroup.works[0].name}` : '',
-      unit_id: units.find(u => u.short_name === newGroup.contractor.unit)?.id || units[0]?.id || '',
+      description: newGroup.works[0]?.name
+        ? `Включает работы: ${newGroup.works[0].name}`
+        : '',
+      unit_id:
+        units.find(u => u.short_name === newGroup.contractor.unit)?.id ||
+        units[0]?.id ||
+        '',
       base_price: newGroup.works[0]?.workPrice || newGroup.totalSum || 0,
       category: 'общестроительные_работы',
-      is_active: true
+      is_active: true,
     }
 
     console.log('handleSaveNewGroup: About to save rateData:', rateData)
@@ -919,23 +1266,39 @@ function Rates() {
     // Сохраняем материалы временно для последующей обработки в onSuccess
     if (newGroup.materials && newGroup.materials.length > 0) {
       // Подготавливаем материалы для сохранения
-      const materialsToSave = newGroup.materials.map(material => ({
-        id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        code: `MAT-${Date.now()}`,
-        name: material.name || 'Новый материал',
-        description: '',
-        category: 'material',
-        unit_id: units.find(u => u.short_name === material.unit)?.id || units[0]?.id || '',
-        unit_name: units.find(u => u.short_name === material.unit)?.name || 'ед',
-        unit_short_name: material.unit || 'ед',
-        last_purchase_price: material.materialPrice || 0,
-        consumption: material.consumptionRate || 1,
-        supplier: '',
-        supplier_article: '',
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }))
+      const materialsToSave = newGroup.materials.map(material => {
+        // Проверяем наличие materialId в расширенных данных материала
+        const materialId = (material as any).materialId
+
+        if (!materialId) {
+          console.error('Material без materialId:', material)
+          throw new Error(
+            `Материал "${material.name}" не имеет ID из справочника. Это не должно произойти.`
+          )
+        }
+
+        return {
+          id: materialId, // Используем реальный ID из справочника materials
+          code: `MAT-${Date.now()}`,
+          name: material.name || 'Новый материал',
+          description: '',
+          category: 'material',
+          unit_id:
+            units.find(u => u.short_name === material.unit)?.id ||
+            units[0]?.id ||
+            '',
+          unit_name:
+            units.find(u => u.short_name === material.unit)?.name || 'ед',
+          unit_short_name: material.unit || 'ед',
+          last_purchase_price: material.materialPrice || 0,
+          consumption: material.consumptionRate || 1,
+          supplier: '',
+          supplier_article: '',
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+      })
 
       // Сохраняем материалы во временное состояние для createMutation.onSuccess
       setTempRateMaterials(materialsToSave)
@@ -944,8 +1307,17 @@ function Rates() {
     }
 
     // Логируем создание новой расценки
-    logger.logFormSubmit('Создание новой расценки', rateData, 'Сборник расценок')
-    logger.logCreate('rates', 'new-rate', rateData, `Создана новая расценка "${rateData.name}"`)
+    logger.logFormSubmit(
+      'Создание новой расценки',
+      rateData,
+      'Сборник расценок'
+    )
+    logger.logCreate(
+      'rates',
+      'new-rate',
+      rateData,
+      `Создана новая расценка "${rateData.name}"`
+    )
 
     // Используем существующую мутацию с её обработчиками onSuccess/onError
     createMutation.mutate(rateData)
@@ -961,6 +1333,7 @@ function Rates() {
     setIsModalOpen(false)
     setEditingRate(null)
     setTempRateMaterials([])
+    setSelectedCatalogMaterial(undefined)
     setActiveTab('1')
     form.resetFields()
   }
@@ -999,25 +1372,38 @@ function Rates() {
     try {
       const values = await form.validateFields()
 
-      console.log('Form submitted', {
+      console.log('🔵 Form submitted', {
         action: 'form_submit',
         values,
         editingRate: editingRate?.id,
         tempMaterialsCount: tempRateMaterials.length,
+        tempMaterials: tempRateMaterials.map(m => ({
+          id: m.id,
+          originalId: (m as any).originalId,
+          code: m.code,
+          name: m.name,
+          consumption: m.consumption,
+        })),
         timestamp: new Date().toISOString(),
       })
 
       if (editingRate) {
+        console.log('🔵 Updating existing rate:', editingRate.id)
         updateMutation.mutate({
           id: editingRate.id,
           data: values,
         })
       } else {
+        console.log('🔵 Creating new rate with materials:', {
+          rateData: values,
+          materialsCount: tempRateMaterials.length,
+          materials: tempRateMaterials,
+        })
         // Создаем расценку (материалы обработаются в onSuccess колбеке)
         createMutation.mutate(values)
       }
     } catch (error) {
-      console.error('Form validation error:', error)
+      console.error('❌ Form validation error:', error)
       message.error('Ошибка валидации формы')
     }
   }
@@ -1036,17 +1422,23 @@ function Rates() {
 
       // Находим соответствующую единицу измерения
       const unit = units.find(u => u.id === values.unit_id)
-      
+
       if (editingMaterial) {
         // Редактирование существующего материала - TODO: реализовать сохранение в БД
-        console.log('Material editing not yet implemented for database persistence')
+        console.log(
+          'Material editing not yet implemented for database persistence'
+        )
         message.info('Редактирование материалов будет реализовано позже')
       } else if (selectedRateForMaterial) {
         // Добавление нового материала - TODO: реализовать сохранение в БД
-        console.log('Individual material addition not yet implemented for database persistence')
-        message.info('Добавление отдельных материалов будет реализовано позже. Используйте добавление через модальное окно расценки.')
+        console.log(
+          'Individual material addition not yet implemented for database persistence'
+        )
+        message.info(
+          'Добавление отдельных материалов будет реализовано позже. Используйте добавление через модальное окно расценки.'
+        )
       }
-      
+
       handleCloseMaterialModal()
     } catch (error) {
       console.error('Material form validation error:', error)
@@ -1072,7 +1464,11 @@ function Rates() {
       timestamp: new Date().toISOString(),
     })
     // Логируем фильтрацию по категории
-    logger.logView('rates', undefined, `Фильтрация расценок по категории: "${category}"`)
+    logger.logView(
+      'rates',
+      undefined,
+      `Фильтрация расценок по категории: "${category}"`
+    )
     setCategoryFilter(category)
   }
 
@@ -1085,14 +1481,44 @@ function Rates() {
 
   // Состояние для управления раскрытыми расценками
   const [expandedRates, setExpandedRates] = useState<Set<string>>(new Set())
-  const [editingMaterial, setEditingMaterial] = useState<(MaterialWithUnit & { parentRateId?: string }) | null>(null)
-  const [tempRateMaterials, setTempRateMaterials] = useState<(MaterialWithUnit & { consumption?: number; originalId?: string })[]>([])
+  const [editingMaterial, setEditingMaterial] = useState<
+    (MaterialWithUnit & { parentRateId?: string }) | null
+  >(null)
+  const [tempRateMaterials, setTempRateMaterials] = useState<
+    (MaterialWithUnit & { consumption?: number; originalId?: string })[]
+  >([])
+  const [selectedCatalogMaterial, setSelectedCatalogMaterial] = useState<
+    string | undefined
+  >(undefined)
   const [activeTab, setActiveTab] = useState<string>('1')
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    new Set()
+  )
+
+  // Функция для переключения состояния развернутой категории
+  const toggleCategoryExpansion = (categoryValue: string) => {
+    console.log('Toggle category expansion:', {
+      action: 'toggle_category',
+      categoryValue,
+      isCurrentlyExpanded: expandedCategories.has(categoryValue),
+      timestamp: new Date().toISOString(),
+    })
+
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(categoryValue)) {
+        newSet.delete(categoryValue)
+      } else {
+        newSet.add(categoryValue)
+      }
+      return newSet
+    })
+  }
 
   // Тестовая функция для добавления примеров материалов
   const addExampleMaterials = (rateId: string) => {
     if (!units.length) return
-    
+
     const exampleMaterials = [
       {
         id: `example-${rateId}-1`,
@@ -1103,7 +1529,7 @@ function Rates() {
         unit_id: units[0]?.id || '',
         unit_name: units[0]?.name || 'шт.',
         unit_short_name: units[0]?.short_name || 'шт.',
-        last_purchase_price: 15.50,
+        last_purchase_price: 15.5,
         supplier: 'Кирпичный завод но. 1',
         supplier_article: 'КО-150',
         is_active: true,
@@ -1119,17 +1545,19 @@ function Rates() {
         unit_id: units[1]?.id || units[0]?.id || '',
         unit_name: units[1]?.name || units[0]?.name || 'кг',
         unit_short_name: units[1]?.short_name || units[0]?.short_name || 'кг',
-        last_purchase_price: 280.00,
+        last_purchase_price: 280.0,
         supplier: 'Лафарж Цемент',
         supplier_article: 'LF-M400-50',
         is_active: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      }
+      },
     ]
-    
+
     // TODO: реализовать сохранение примеров материалов в БД
-    console.log('Example materials addition not yet implemented for database persistence')
+    console.log(
+      'Example materials addition not yet implemented for database persistence'
+    )
     message.info('Добавление примеров материалов будет реализовано позже')
   }
 
@@ -1160,11 +1588,16 @@ function Rates() {
     const matchesSearch =
       !searchText ||
       group.contractor.name.toLowerCase().includes(searchText.toLowerCase()) ||
-      group.works.some(w => w.name.toLowerCase().includes(searchText.toLowerCase())) ||
-      group.materials.some(m => m.name.toLowerCase().includes(searchText.toLowerCase()))
+      group.works.some(w =>
+        w.name.toLowerCase().includes(searchText.toLowerCase())
+      ) ||
+      group.materials.some(m =>
+        m.name.toLowerCase().includes(searchText.toLowerCase())
+      )
 
     const rate = rates.find(r => r.id === group.id)
-    const matchesCategory = !categoryFilter || (rate && rate.category === categoryFilter)
+    const matchesCategory =
+      !categoryFilter || (rate && rate.category === categoryFilter)
 
     return matchesSearch && matchesCategory
   })
@@ -1175,7 +1608,7 @@ function Rates() {
       style: 'currency',
       currency: 'RUB',
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0
+      maximumFractionDigits: 0,
     })
   }
 
@@ -1184,38 +1617,48 @@ function Rates() {
   }
 
   const totalCost = getTotalCost(filteredGroups)
-  const totalWorksCost = filteredGroups.reduce((sum, group) =>
-    sum + group.works.reduce((workSum, work) => workSum + work.total, 0), 0
+  const totalWorksCost = filteredGroups.reduce(
+    (sum, group) =>
+      sum + group.works.reduce((workSum, work) => workSum + work.total, 0),
+    0
   )
-  const totalMaterialsCost = filteredGroups.reduce((sum, group) =>
-    sum + group.materials.reduce((materialSum, material) => materialSum + material.total, 0), 0
+  const totalMaterialsCost = filteredGroups.reduce(
+    (sum, group) =>
+      sum +
+      group.materials.reduce(
+        (materialSum, material) => materialSum + material.total,
+        0
+      ),
+    0
   )
 
   // Типы для иерархических данных
-  type HierarchicalDataItem = (RateWithUnit & {
-    isParentRate?: boolean;
-    isExpanded?: boolean;
-  }) | (MaterialWithUnit & {
-    isChildMaterial: true;
-    parentRateId: string;
-    level: number;
-    materialIndex: number;
-    rateMaterialId?: string;
-    consumption?: number;
-  });
+  type HierarchicalDataItem =
+    | (RateWithUnit & {
+        isParentRate?: boolean
+        isExpanded?: boolean
+      })
+    | (MaterialWithUnit & {
+        isChildMaterial: true
+        parentRateId: string
+        level: number
+        materialIndex: number
+        rateMaterialId?: string
+        consumption?: number
+      })
 
   // Создаем иерархичную структуру данных
   const createHierarchicalData = () => {
     const result: HierarchicalDataItem[] = []
-    
+
     filteredRates.forEach(rate => {
       // Добавляем основную расценку (работу)
       result.push({
         ...rate,
         isParentRate: true,
-        isExpanded: expandedRates.has(rate.id)
+        isExpanded: expandedRates.has(rate.id),
       })
-      
+
       // Если расценка раскрыта, добавляем её материалы
       if (expandedRates.has(rate.id)) {
         const rateLinkedMaterials = allRateMaterials[rate.id] || []
@@ -1240,13 +1683,13 @@ function Rates() {
               parentRateId: rate.id,
               level: 1,
               materialIndex: index,
-              rateMaterialId: rateMaterial.id // Для обновлений
+              rateMaterialId: rateMaterial.id, // Для обновлений
             })
           }
         })
       }
     })
-    
+
     return result
   }
 
@@ -1278,7 +1721,9 @@ function Rates() {
     })
 
     // TODO: реализовать удаление материала из БД
-    console.log('Material deletion not yet implemented for database persistence')
+    console.log(
+      'Material deletion not yet implemented for database persistence'
+    )
     message.info('Удаление материалов будет реализовано позже')
   }
 
@@ -1290,7 +1735,7 @@ function Rates() {
       render: (code: string, record: any) => {
         const isParent = !record.isChildMaterial
         const marginLeft = isParent ? 0 : 32
-        
+
         if (isParent) {
           // Родительская расценка (работа)
           return (
@@ -1304,7 +1749,13 @@ function Rates() {
               />
               <div style={{ fontWeight: 600, color: '#1890ff' }}>
                 <div>{code}</div>
-                <div style={{ fontSize: '12px', color: '#666', fontWeight: 'normal' }}>
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: '#666',
+                    fontWeight: 'normal',
+                  }}
+                >
                   {record.name}
                 </div>
               </div>
@@ -1315,7 +1766,9 @@ function Rates() {
           return (
             <div style={{ marginLeft, color: '#666' }}>
               <div style={{ fontSize: '12px' }}>├─ {code}</div>
-              <div style={{ fontSize: '11px', color: '#999' }}>{record.name}</div>
+              <div style={{ fontSize: '11px', color: '#999' }}>
+                {record.name}
+              </div>
             </div>
           )
         }
@@ -1340,96 +1793,128 @@ function Rates() {
         if ('isChildMaterial' in record && record.isChildMaterial) {
           return null
         }
-        
+
         // Найти все материалы для этой расценки из hierarchicalData
-        const rateMaterials = hierarchicalData.filter(item => 
-          'isChildMaterial' in item && item.isChildMaterial && 
-          'parentRateId' in item && item.parentRateId === record.id
+        const rateMaterials = hierarchicalData.filter(
+          item =>
+            'isChildMaterial' in item &&
+            item.isChildMaterial &&
+            'parentRateId' in item &&
+            item.parentRateId === record.id
         )
-        
+
         console.log('Materials for rate', record.id, {
           rateMaterials,
           allRateMaterials,
           hierarchicalDataCount: hierarchicalData.length,
-          fromAllRateMaterials: allRateMaterials[record.id]
+          fromAllRateMaterials: allRateMaterials[record.id],
         })
-        
+
         if (rateMaterials.length === 0) {
           return (
-            <div style={{ 
-              padding: '8px 12px', 
-              backgroundColor: '#fafafa', 
-              border: '1px dashed #d9d9d9', 
-              borderRadius: '6px',
-              textAlign: 'center'
-            }}>
+            <div
+              style={{
+                padding: '8px 12px',
+                backgroundColor: '#fafafa',
+                border: '1px dashed #d9d9d9',
+                borderRadius: '6px',
+                textAlign: 'center',
+              }}
+            >
               <span style={{ color: '#999', fontSize: '12px' }}>
                 📦 Материалы не добавлены
               </span>
             </div>
           )
         }
-        
+
         return (
-          <div style={{ 
-            fontSize: '11px', 
-            backgroundColor: '#f6ffed', 
-            border: '1px solid #b7eb8f', 
-            borderRadius: '6px',
-            padding: '8px'
-          }}>
-            <div style={{ 
-              fontWeight: 600, 
-              color: '#52c41a', 
-              marginBottom: '6px',
-              fontSize: '12px'
-            }}>
+          <div
+            style={{
+              fontSize: '11px',
+              backgroundColor: '#f6ffed',
+              border: '1px solid #b7eb8f',
+              borderRadius: '6px',
+              padding: '8px',
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 600,
+                color: '#52c41a',
+                marginBottom: '6px',
+                fontSize: '12px',
+              }}
+            >
               📦 Материалов: {rateMaterials.length}
             </div>
-            
+
             {rateMaterials.map((material, index) => {
-              if (!('isChildMaterial' in material) || !material.isChildMaterial) return null
-              
+              if (!('isChildMaterial' in material) || !material.isChildMaterial)
+                return null
+
               const consumption = material.consumption || 1
               const price = material.last_purchase_price || 0
               const totalCost = price * consumption
-              
+
               return (
-                <div 
-                  key={material.id} 
-                  style={{ 
+                <div
+                  key={material.id}
+                  style={{
                     marginBottom: index < rateMaterials.length - 1 ? 6 : 0,
                     padding: '4px 6px',
                     backgroundColor: 'white',
                     border: '1px solid #e8f5e8',
-                    borderRadius: '4px'
+                    borderRadius: '4px',
                   }}
                 >
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center' 
-                  }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
                     <div style={{ flex: 1 }}>
-                      <div style={{ color: '#1890ff', fontWeight: 600, fontSize: '12px' }}>
+                      <div
+                        style={{
+                          color: '#1890ff',
+                          fontWeight: 600,
+                          fontSize: '12px',
+                        }}
+                      >
                         {material.code}
                       </div>
-                      <div style={{ 
-                        color: '#262626', 
-                        fontSize: '11px',
-                        maxWidth: '180px',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                      }}>
+                      <div
+                        style={{
+                          color: '#262626',
+                          fontSize: '11px',
+                          maxWidth: '180px',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
                         {material.name}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right', marginLeft: '8px' }}>
-                      <div style={{ color: '#722ed1', fontWeight: 600, fontSize: '11px' }}>
+                      <div
+                        style={{
+                          color: '#722ed1',
+                          fontWeight: 600,
+                          fontSize: '11px',
+                        }}
+                      >
                         {consumption} {material.unit_short_name}
                       </div>
-                      <div style={{ color: '#52c41a', fontWeight: 600, fontSize: '11px' }}>
+                      <div
+                        style={{
+                          color: '#52c41a',
+                          fontWeight: 600,
+                          fontSize: '11px',
+                        }}
+                      >
                         {totalCost.toFixed(2)} ₽
                       </div>
                     </div>
@@ -1437,20 +1922,31 @@ function Rates() {
                 </div>
               )
             })}
-            
-            <div style={{ 
-              marginTop: 8, 
-              paddingTop: 6, 
-              borderTop: '2px solid #52c41a',
-              textAlign: 'center'
-            }}>
-              <span style={{ color: '#52c41a', fontWeight: 700, fontSize: '13px' }}>
-                💰 Итого: {rateMaterials.reduce((sum, m) => {
-                  if ('isChildMaterial' in m && m.isChildMaterial) {
-                    return sum + (m.last_purchase_price || 0) * (m.consumption || 1)
-                  }
-                  return sum
-                }, 0).toFixed(2)} ₽
+
+            <div
+              style={{
+                marginTop: 8,
+                paddingTop: 6,
+                borderTop: '2px solid #52c41a',
+                textAlign: 'center',
+              }}
+            >
+              <span
+                style={{ color: '#52c41a', fontWeight: 700, fontSize: '13px' }}
+              >
+                💰 Итого:{' '}
+                {rateMaterials
+                  .reduce((sum, m) => {
+                    if ('isChildMaterial' in m && m.isChildMaterial) {
+                      return (
+                        sum +
+                        (m.last_purchase_price || 0) * (m.consumption || 1)
+                      )
+                    }
+                    return sum
+                  }, 0)
+                  .toFixed(2)}{' '}
+                ₽
               </span>
             </div>
           </div>
@@ -1462,21 +1958,28 @@ function Rates() {
       dataIndex: 'unit_short_name',
       key: 'unit_short_name',
       width: 80,
-      sorter: (a: any, b: any) => a.unit_short_name.localeCompare(b.unit_short_name),
+      sorter: (a: any, b: any) =>
+        a.unit_short_name.localeCompare(b.unit_short_name),
     },
     {
       title: 'Расход',
       key: 'consumption',
       width: 100,
       render: (_: any, record: HierarchicalDataItem) => {
-        if ('isChildMaterial' in record && record.isChildMaterial && record.consumption) {
+        if (
+          'isChildMaterial' in record &&
+          record.isChildMaterial &&
+          record.consumption
+        ) {
           return (
             <span style={{ color: '#1890ff', fontWeight: 500 }}>
               {record.consumption} {record.unit_short_name}
             </span>
           )
         }
-        return ('isChildMaterial' in record && record.isChildMaterial) ? '1 ед.' : '—'
+        return 'isChildMaterial' in record && record.isChildMaterial
+          ? '1 ед.'
+          : '—'
       },
     },
     {
@@ -1488,10 +1991,12 @@ function Rates() {
           const price = record.last_purchase_price || 0
           const consumption = record.consumption || 1
           const totalCost = price * consumption
-          
+
           return (
             <div>
-              <div>{price.toFixed(2)} ₽/{record.unit_short_name}</div>
+              <div>
+                {price.toFixed(2)} ₽/{record.unit_short_name}
+              </div>
               {consumption !== 1 && (
                 <div style={{ fontSize: '11px', color: '#666' }}>
                   Итого: {totalCost.toFixed(2)} ₽
@@ -1500,11 +2005,14 @@ function Rates() {
             </div>
           )
         }
-        
+
         // Для родительских расценок - показать базовую цену + стоимость материалов
-        const rateMaterials = hierarchicalData.filter(item => 
-          'isChildMaterial' in item && item.isChildMaterial && 
-          'parentRateId' in item && item.parentRateId === record.id
+        const rateMaterials = hierarchicalData.filter(
+          item =>
+            'isChildMaterial' in item &&
+            item.isChildMaterial &&
+            'parentRateId' in item &&
+            item.parentRateId === record.id
         )
         const materialsCost = rateMaterials.reduce((sum, m) => {
           if ('isChildMaterial' in m && m.isChildMaterial) {
@@ -1512,15 +2020,15 @@ function Rates() {
           }
           return sum
         }, 0)
-        const totalCost = ('base_price' in record ? record.base_price : 0) + materialsCost
-        
+        const totalCost =
+          ('base_price' in record ? record.base_price : 0) + materialsCost
+
         return (
           <div>
-            <div style={{ fontWeight: 600 }}>
-              {totalCost.toFixed(2)} ₽
-            </div>
+            <div style={{ fontWeight: 600 }}>{totalCost.toFixed(2)} ₽</div>
             <div style={{ fontSize: '11px', color: '#666' }}>
-              Работа: {('base_price' in record ? record.base_price : 0).toFixed(2)} ₽
+              Работа:{' '}
+              {('base_price' in record ? record.base_price : 0).toFixed(2)} ₽
             </div>
             {materialsCost > 0 && (
               <div style={{ fontSize: '11px', color: '#52c41a' }}>
@@ -1532,13 +2040,16 @@ function Rates() {
       },
       sorter: (a: HierarchicalDataItem, b: HierarchicalDataItem) => {
         let priceA, priceB
-        
+
         if ('isChildMaterial' in a && a.isChildMaterial) {
           priceA = a.last_purchase_price || 0
         } else {
-          const aMaterials = hierarchicalData.filter(item => 
-            'isChildMaterial' in item && item.isChildMaterial && 
-            'parentRateId' in item && item.parentRateId === a.id
+          const aMaterials = hierarchicalData.filter(
+            item =>
+              'isChildMaterial' in item &&
+              item.isChildMaterial &&
+              'parentRateId' in item &&
+              item.parentRateId === a.id
           )
           const aMaterialsCost = aMaterials.reduce((sum, m) => {
             if ('isChildMaterial' in m && m.isChildMaterial) {
@@ -1548,13 +2059,16 @@ function Rates() {
           }, 0)
           priceA = ('base_price' in a ? a.base_price : 0) + aMaterialsCost
         }
-        
+
         if ('isChildMaterial' in b && b.isChildMaterial) {
           priceB = b.last_purchase_price || 0
         } else {
-          const bMaterials = hierarchicalData.filter(item => 
-            'isChildMaterial' in item && item.isChildMaterial && 
-            'parentRateId' in item && item.parentRateId === b.id
+          const bMaterials = hierarchicalData.filter(
+            item =>
+              'isChildMaterial' in item &&
+              item.isChildMaterial &&
+              'parentRateId' in item &&
+              item.parentRateId === b.id
           )
           const bMaterialsCost = bMaterials.reduce((sum, m) => {
             if ('isChildMaterial' in m && m.isChildMaterial) {
@@ -1564,7 +2078,7 @@ function Rates() {
           }, 0)
           priceB = ('base_price' in b ? b.base_price : 0) + bMaterialsCost
         }
-        
+
         return priceA - priceB
       },
     },
@@ -1582,9 +2096,11 @@ function Rates() {
             insulation: { label: 'Утеплители', color: 'green' },
             finishing: { label: 'Отделочные', color: 'purple' },
             material: { label: 'Материал', color: 'red' },
-            other: { label: 'Прочие', color: 'default' }
+            other: { label: 'Прочие', color: 'default' },
           }
-          const config = materialCategories[category as keyof typeof materialCategories] || materialCategories.other
+          const config =
+            materialCategories[category as keyof typeof materialCategories] ||
+            materialCategories.other
           return <Tag color={config.color}>{config.label}</Tag>
         }
         const config = getCategoryConfig(category)
@@ -1612,7 +2128,7 @@ function Rates() {
           style={{
             color: isActive ? '#52c41a' : '#ff4d4f',
             fontWeight: 500,
-            opacity: record.isChildMaterial ? 0.7 : 1
+            opacity: record.isChildMaterial ? 0.7 : 1,
           }}
         >
           {isActive ? 'Активна' : 'Неактивна'}
@@ -1660,7 +2176,7 @@ function Rates() {
             </Space>
           )
         }
-        
+
         return (
           <Space>
             <Button
@@ -1709,274 +2225,747 @@ function Rates() {
   ]
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px' }}>
-      {/* Заголовок */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <Title level={2} style={{ margin: 0, color: '#1f2937' }}>
-          <BuildOutlined style={{ marginRight: '12px' }} />
-          Сборник расценок
-        </Title>
-        <Button
-          type="primary"
-          size="large"
-          icon={<PlusOutlined />}
-          onClick={handleAddNewGroup}
+    <div
+      style={{
+        height: 'calc(100vh - 96px)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Заголовок и кнопки */}
+      <div
+        className="modern-page-header"
+        style={{ flexShrink: 0, paddingBottom: 16 }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 16,
+          }}
         >
-          Добавить расценку
-        </Button>
-      </div>
-
-      {/* Таблица расценок в новом стиле */}
-      <div style={{
-        backgroundColor: 'white',
-        border: '2px solid #000',
-        marginBottom: '24px'
-      }}>
-        {/* Заголовок таблицы */}
-        <div style={{
-          backgroundColor: '#FFE4B5',
-          textAlign: 'center',
-          padding: '8px',
-          fontWeight: 'bold',
-          borderBottom: '1px solid #000',
-          fontSize: '14px'
-        }}>
-          Расценки на основании
+          <div className="modern-page-title">
+            <div className="modern-page-icon rates">
+              <BuildOutlined />
+            </div>
+            <div>
+              <Title
+                level={2}
+                style={{
+                  margin: 0,
+                  color: '#1a1a1a',
+                  fontSize: 28,
+                  fontWeight: 700,
+                }}
+              >
+                Сборник расценок
+              </Title>
+              <div style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>
+                Управление расценками и материалами
+              </div>
+            </div>
+          </div>
+          <Button
+            type="primary"
+            size="large"
+            icon={<PlusOutlined />}
+            onClick={handleAddNewGroup}
+            style={{
+              borderRadius: 8,
+              height: 44,
+              paddingLeft: 24,
+              paddingRight: 24,
+              fontSize: 15,
+              fontWeight: 600,
+            }}
+          >
+            Добавить расценку
+          </Button>
         </div>
 
-        {/* Таблица с фильтрами и данными */}
-        <table style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          fontSize: '12px'
-        }}>
-          {/* Строка с фильтрами */}
-          <tr style={{
-            backgroundColor: '#E6E6FA',
-            borderBottom: '1px solid #000'
-          }}>
-            <td style={{
-              padding: '5px',
-              borderRight: '1px solid #000',
-              textAlign: 'center',
-              fontWeight: 'bold',
-              width: '60px'
-            }}>
-              Параметр для фильтра<br/>
+        {/* Современные фильтры */}
+        <Card
+          style={{ borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
+        >
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <div
+                style={{
+                  marginBottom: 4,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#374151',
+                }}
+              >
+                Категория
+              </div>
               <Select
-                size="small"
-                style={{ width: '90%', fontSize: '11px' }}
-                placeholder="Все"
+                style={{ width: '100%' }}
+                placeholder="Все категории"
                 allowClear
-                onChange={(value) => setCategoryFilter(value)}
+                showSearch
+                value={categoryFilter}
+                onChange={handleCategoryFilter}
+                filterOption={(input, option) => {
+                  const text =
+                    (option?.children || option?.label)?.toString() || ''
+                  return text.toLowerCase().includes(input.toLowerCase())
+                }}
               >
                 {categoryOptions.map(opt => (
                   <Select.Option key={opt.value} value={opt.value}>
-                    {opt.label}
+                    <Tag color={opt.color} style={{ marginRight: 8 }}>
+                      {opt.label}
+                    </Tag>
                   </Select.Option>
                 ))}
               </Select>
-            </td>
-            <td style={{
-              padding: '5px',
-              borderRight: '1px solid #000',
-              textAlign: 'center',
-              fontWeight: 'bold',
-              width: '300px'
-            }}>
-              Наименование<br/>
-              <Input
-                size="small"
-                style={{ width: '90%', fontSize: '11px' }}
-                placeholder="Поиск..."
-                onChange={(e) => setSearchText(e.target.value)}
-              />
-            </td>
-            <td style={{
-              padding: '5px',
-              borderRight: '1px solid #000',
-              textAlign: 'center',
-              fontWeight: 'bold',
-              width: '100px'
-            }}>
-              Дата<br/>подписания<br/>
-              <DatePicker
-                size="small"
-                style={{ width: '90%', fontSize: '11px' }}
-                placeholder="Выберите"
-              />
-            </td>
-            <td style={{
-              padding: '5px',
-              borderRight: '1px solid #000',
-              textAlign: 'center',
-              fontWeight: 'bold',
-              width: '80px'
-            }}>
-              Ед. изм.<br/>
-              <Select
-                size="small"
-                style={{ width: '90%', fontSize: '11px' }}
-                placeholder="Все"
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <div
+                style={{
+                  marginBottom: 4,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#374151',
+                }}
+              >
+                Поиск
+              </div>
+              <Search
+                placeholder="Поиск по коду или названию..."
                 allowClear
+                onSearch={handleSearch}
+                onChange={e => handleSearch(e.target.value)}
+                style={{ width: '100%' }}
+              />
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <div
+                style={{
+                  marginBottom: 4,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#374151',
+                }}
+              >
+                Единица измерения
+              </div>
+              <Select
+                style={{ width: '100%' }}
+                placeholder="Все единицы"
+                allowClear
+                showSearch
+                filterOption={(input, option) => {
+                  const text =
+                    (option?.children || option?.label)?.toString() || ''
+                  return text.toLowerCase().includes(input.toLowerCase())
+                }}
               >
                 {units.map(unit => (
                   <Select.Option key={unit.id} value={unit.short_name}>
-                    {unit.short_name}
+                    {unit.name} ({unit.short_name})
                   </Select.Option>
                 ))}
               </Select>
-            </td>
-            <td style={{
-              padding: '5px',
-              textAlign: 'center',
-              fontWeight: 'bold',
-              width: '120px'
-            }}>
-              Цена,<br/>рубл. в тыс.<br/>
-              <InputNumber
-                size="small"
-                style={{ width: '90%', fontSize: '11px' }}
-                placeholder="От"
-              />
-            </td>
-          </tr>
-        </table>
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <div
+                style={{
+                  marginBottom: 4,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#374151',
+                }}
+              >
+                Статистика
+              </div>
+              <div style={{ display: 'flex', gap: 16 }}>
+                <Statistic
+                  title="Всего"
+                  value={filteredGroups.length}
+                  suffix="расценок"
+                  valueStyle={{ fontSize: 16, color: '#1890ff' }}
+                />
+                <Statistic
+                  title="Общая сумма"
+                  value={totalCost}
+                  formatter={value => formatCurrency(Number(value))}
+                  valueStyle={{ fontSize: 16, color: '#52c41a' }}
+                />
+              </div>
+            </Col>
+          </Row>
+        </Card>
       </div>
 
+      {/* Контент с расценками */}
+      <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
+        {filteredGroups.length === 0 ? (
+          <Card
+            style={{ textAlign: 'center', borderRadius: 12, margin: '20px 0' }}
+          >
+            <div style={{ padding: '40px 20px' }}>
+              <FileTextOutlined
+                style={{ fontSize: 48, color: '#d9d9d9', marginBottom: 16 }}
+              />
+              <Title level={4} style={{ color: '#999', marginBottom: 8 }}>
+                {isLoading ? 'Загрузка расценок...' : 'Расценки не найдены'}
+              </Title>
+              <Text type="secondary">
+                {isLoading
+                  ? 'Пожалуйста, подождите...'
+                  : 'Начните с создания новой расценки'}
+              </Text>
+              {!isLoading && (
+                <div style={{ marginTop: 20 }}>
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={handleAddNewGroup}
+                  >
+                    Создать первую расценку
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Card>
+        ) : (
+          <div className="rates-categories-container">
+            {/* Полный список всех категорий */}
+            {categoryOptions.map(categoryOption => {
+              const categoryRates = filteredGroups.filter(group => {
+                const rate = rates.find(r => r.id === group.id)
+                return rate?.category === categoryOption.value
+              })
 
-      {/* Табличные данные расценок */}
-      <div style={{
-        backgroundColor: 'white',
-        border: '2px solid #000',
-        borderTop: 'none',
-        marginBottom: '24px'
-      }}>
-        <table style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          fontSize: '12px'
-        }}>
-          {filteredGroups.length === 0 ? (
-            <tr style={{ backgroundColor: '#B0C4DE' }}>
-              <td colSpan={5} style={{
-                padding: '20px',
-                textAlign: 'center',
-                borderBottom: '1px solid #000'
-              }}>
-                {isLoading ? 'Загрузка расценок...' : 'Нет расценок. Нажмите "Добавить расценку" для создания новой.'}
-              </td>
-            </tr>
-          ) : (
-            filteredGroups.map((group, index) => {
-              const rate = rates.find(r => r.id === group.id)
-              const isCategory = group.works.length === 0 && group.materials.length === 0
+              const isExpanded = expandedCategories.has(categoryOption.value)
+              const hasRates = categoryRates.length > 0
 
               return (
-                <React.Fragment key={group.id}>
-                  {/* Основная строка расценки */}
-                  <tr style={{
-                    backgroundColor: isCategory ? '#98FB98' : '#B0C4DE',
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => toggleRateExpansion(group.id)}
+                <div
+                  key={categoryOption.value}
+                  className="category-section"
+                  style={{ marginBottom: 24 }}
+                >
+                  {/* Кликабельный заголовок категории */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '16px 20px',
+                      background: hasRates
+                        ? `linear-gradient(135deg, ${categoryOption.color}15, ${categoryOption.color}08)`
+                        : '#f8f9fa',
+                      borderRadius: 12,
+                      border: hasRates
+                        ? `1px solid ${categoryOption.color}30`
+                        : '1px solid #e9ecef',
+                      cursor: hasRates ? 'pointer' : 'default',
+                      transition: 'all 0.2s ease',
+                      opacity: hasRates ? 1 : 0.6,
+                    }}
+                    onClick={() =>
+                      hasRates && toggleCategoryExpansion(categoryOption.value)
+                    }
+                    onMouseEnter={e => {
+                      if (hasRates) {
+                        e.currentTarget.style.background = `linear-gradient(135deg, ${categoryOption.color}25, ${categoryOption.color}15)`
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      if (hasRates) {
+                        e.currentTarget.style.background = `linear-gradient(135deg, ${categoryOption.color}15, ${categoryOption.color}08)`
+                      }
+                    }}
                   >
-                    <td style={{
-                      padding: '4px 6px',
-                      borderRight: '1px solid #000',
-                      borderBottom: '1px solid #000',
-                      textAlign: 'center',
-                      width: '60px'
-                    }}>
-                      {expandedRates.has(group.id) ? '-' : '+'}
-                    </td>
-                    <td style={{
-                      padding: '4px 6px',
-                      borderRight: '1px solid #000',
-                      borderBottom: '1px solid #000',
-                      fontWeight: isCategory ? 'bold' : 'normal',
-                      width: '300px'
-                    }}>
-                      {group.contractor.name}
-                    </td>
-                    <td style={{
-                      padding: '4px 6px',
-                      borderRight: '1px solid #000',
-                      borderBottom: '1px solid #000',
-                      textAlign: 'center',
-                      width: '100px'
-                    }}>
-                      {rate?.created_at ? new Date(rate.created_at).toLocaleDateString('ru-RU') : ''}
-                    </td>
-                    <td style={{
-                      padding: '4px 6px',
-                      borderRight: '1px solid #000',
-                      borderBottom: '1px solid #000',
-                      textAlign: 'center',
-                      width: '80px'
-                    }}>
-                      {group.contractor.unit}
-                    </td>
-                    <td style={{
-                      padding: '4px 6px',
-                      borderBottom: '1px solid #000',
-                      textAlign: 'right',
-                      width: '120px'
-                    }}>
-                      {(group.totalSum / 1000).toFixed(2)}
-                      <Space style={{ marginLeft: '8px' }}>
-                        <EditOutlined
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleEditGroup(group.id)
+                    <div
+                      style={{ display: 'flex', alignItems: 'center', gap: 12 }}
+                    >
+                      {hasRates && (
+                        <div
+                          style={{
+                            width: 20,
+                            height: 20,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: categoryOption.color,
                           }}
-                          style={{ cursor: 'pointer', color: '#1890ff' }}
-                        />
-                        <DeleteOutlined
-                          onClick={(e) => {
+                        >
+                          {isExpanded ? <DownOutlined /> : <RightOutlined />}
+                        </div>
+                      )}
+                      <Tag
+                        color={categoryOption.color}
+                        style={{
+                          margin: 0,
+                          fontSize: 13,
+                          fontWeight: 600,
+                          padding: '4px 12px',
+                          borderRadius: 8,
+                        }}
+                      >
+                        {categoryOption.label}
+                      </Tag>
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          color: hasRates ? '#64748b' : '#999',
+                        }}
+                      >
+                        {hasRates
+                          ? `${categoryRates.length} расценок • ${formatCurrency(categoryRates.reduce((sum, group) => sum + group.totalSum, 0))}`
+                          : 'Нет расценок'}
+                      </Text>
+                    </div>
+                    <div
+                      style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                    >
+                      {hasRates && isExpanded && (
+                        <Button
+                          type="primary"
+                          size="small"
+                          icon={<PlusOutlined />}
+                          onClick={e => {
                             e.stopPropagation()
-                            handleDeleteGroup(group.id)
+                            // Создаем новую расценку с предустановленной категорией
+                            setEditingRate(null)
+                            form.resetFields()
+                            form.setFieldsValue({
+                              is_active: true,
+                              category: categoryOption.value,
+                              base_price: 0,
+                            })
+                            setTempRateMaterials([])
+                            setActiveTab('1')
+                            setIsModalOpen(true)
                           }}
-                          style={{ cursor: 'pointer', color: '#ff4d4f' }}
-                        />
-                      </Space>
-                    </td>
-                  </tr>
+                          style={{ borderRadius: 6 }}
+                        >
+                          Добавить расценку
+                        </Button>
+                      )}
+                      {!hasRates && (
+                        <Button
+                          type="dashed"
+                          size="small"
+                          icon={<PlusOutlined />}
+                          onClick={e => {
+                            e.stopPropagation()
+                            // Создаем новую расценку с предустановленной категорией
+                            setEditingRate(null)
+                            form.resetFields()
+                            form.setFieldsValue({
+                              is_active: true,
+                              category: categoryOption.value,
+                              base_price: 0,
+                            })
+                            setTempRateMaterials([])
+                            setActiveTab('1')
+                            setIsModalOpen(true)
+                          }}
+                          style={{ borderRadius: 6 }}
+                        >
+                          Создать первую расценку
+                        </Button>
+                      )}
+                    </div>
+                  </div>
 
-                  {/* Раскрывающиеся подразделы */}
-                  {expandedRates.has(group.id) && group.works.length > 0 && (
-                    <tr style={{ backgroundColor: '#B0C4DE' }}>
-                      <td></td>
-                      <td colSpan={4} style={{
-                        padding: '4px 6px',
-                        paddingLeft: '15px',
-                        borderBottom: '1px solid #000',
-                        fontStyle: 'italic'
-                      }}>
-                        {group.works.map(work => work.name).join(', ')}
-                      </td>
-                    </tr>
+                  {/* Таблица расценок категории (показывается только если категория развернута) */}
+                  {isExpanded && hasRates && (
+                    <Card
+                      style={{
+                        borderRadius: 12,
+                        overflow: 'hidden',
+                        border: `1px solid ${categoryOption.color}20`,
+                        marginTop: 16,
+                      }}
+                    >
+                      <div
+                        className="modern-table"
+                        style={{ overflow: 'hidden' }}
+                      >
+                        <table
+                          style={{ width: '100%', borderCollapse: 'collapse' }}
+                        >
+                          <thead>
+                            <tr
+                              style={{
+                                background: `linear-gradient(135deg, ${categoryOption.color}, ${categoryOption.color}dd)`,
+                                color: 'white',
+                              }}
+                            >
+                              <th
+                                style={{
+                                  padding: '12px 16px',
+                                  textAlign: 'left',
+                                  fontWeight: 600,
+                                  fontSize: 13,
+                                  border: 'none',
+                                }}
+                              >
+                                Код
+                              </th>
+                              <th
+                                style={{
+                                  padding: '12px 16px',
+                                  textAlign: 'left',
+                                  fontWeight: 600,
+                                  fontSize: 13,
+                                  border: 'none',
+                                }}
+                              >
+                                Наименование
+                              </th>
+                              <th
+                                style={{
+                                  padding: '12px 16px',
+                                  textAlign: 'center',
+                                  fontWeight: 600,
+                                  fontSize: 13,
+                                  border: 'none',
+                                }}
+                              >
+                                Ед. изм.
+                              </th>
+                              <th
+                                style={{
+                                  padding: '12px 16px',
+                                  textAlign: 'right',
+                                  fontWeight: 600,
+                                  fontSize: 13,
+                                  border: 'none',
+                                }}
+                              >
+                                Цена работ
+                              </th>
+                              <th
+                                style={{
+                                  padding: '12px 16px',
+                                  textAlign: 'right',
+                                  fontWeight: 600,
+                                  fontSize: 13,
+                                  border: 'none',
+                                }}
+                              >
+                                Материалы
+                              </th>
+                              <th
+                                style={{
+                                  padding: '12px 16px',
+                                  textAlign: 'right',
+                                  fontWeight: 600,
+                                  fontSize: 13,
+                                  border: 'none',
+                                }}
+                              >
+                                Итого
+                              </th>
+                              <th
+                                style={{
+                                  padding: '12px 16px',
+                                  textAlign: 'center',
+                                  fontWeight: 600,
+                                  fontSize: 13,
+                                  border: 'none',
+                                  width: 120,
+                                }}
+                              >
+                                Действия
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {categoryRates.map((group, index) => {
+                              const rate = rates.find(r => r.id === group.id)
+                              const isExpanded = expandedRates.has(group.id)
+                              const worksCost = group.works.reduce(
+                                (sum, w) => sum + w.total,
+                                0
+                              )
+                              const materialsCost = group.materials.reduce(
+                                (sum, m) => sum + m.total,
+                                0
+                              )
+
+                              return (
+                                <React.Fragment key={group.id}>
+                                  <tr
+                                    style={{
+                                      backgroundColor:
+                                        index % 2 === 0 ? '#fafafa' : 'white',
+                                      borderBottom: '1px solid #f0f0f0',
+                                      cursor: 'pointer',
+                                      transition: 'background-color 0.2s ease',
+                                    }}
+                                    onMouseEnter={e => {
+                                      e.currentTarget.style.backgroundColor = `${categoryOption.color}10`
+                                    }}
+                                    onMouseLeave={e => {
+                                      e.currentTarget.style.backgroundColor =
+                                        index % 2 === 0 ? '#fafafa' : 'white'
+                                    }}
+                                    onClick={() =>
+                                      toggleRateExpansion(group.id)
+                                    }
+                                  >
+                                    <td
+                                      style={{
+                                        padding: '12px 16px',
+                                        fontSize: 13,
+                                        fontWeight: 600,
+                                        color: '#1890ff',
+                                      }}
+                                    >
+                                      {rate?.code || '-'}
+                                    </td>
+                                    <td style={{ padding: '12px 16px' }}>
+                                      <div>
+                                        <div
+                                          style={{
+                                            fontSize: 14,
+                                            fontWeight: 600,
+                                            color: '#1a1a1a',
+                                            marginBottom: 2,
+                                          }}
+                                        >
+                                          {group.contractor.name}
+                                        </div>
+                                        {rate?.description && (
+                                          <div
+                                            style={{
+                                              fontSize: 12,
+                                              color: '#64748b',
+                                              lineHeight: 1.3,
+                                            }}
+                                          >
+                                            {rate.description.length > 80
+                                              ? `${rate.description.substring(0, 80)}...`
+                                              : rate.description}
+                                          </div>
+                                        )}
+                                        {group.materials.length > 0 && (
+                                          <div
+                                            style={{
+                                              fontSize: 11,
+                                              color: '#52c41a',
+                                              marginTop: 4,
+                                            }}
+                                          >
+                                            📦 {group.materials.length}{' '}
+                                            материалов
+                                          </div>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td
+                                      style={{
+                                        padding: '12px 16px',
+                                        textAlign: 'center',
+                                        fontSize: 13,
+                                      }}
+                                    >
+                                      {group.contractor.unit}
+                                    </td>
+                                    <td
+                                      style={{
+                                        padding: '12px 16px',
+                                        textAlign: 'right',
+                                        fontSize: 14,
+                                        fontWeight: 600,
+                                        color: '#1890ff',
+                                      }}
+                                    >
+                                      {formatCurrency(worksCost)}
+                                    </td>
+                                    <td
+                                      style={{
+                                        padding: '12px 16px',
+                                        textAlign: 'right',
+                                        fontSize: 14,
+                                        fontWeight: 600,
+                                        color: '#52c41a',
+                                      }}
+                                    >
+                                      {formatCurrency(materialsCost)}
+                                    </td>
+                                    <td
+                                      style={{
+                                        padding: '12px 16px',
+                                        textAlign: 'right',
+                                        fontSize: 16,
+                                        fontWeight: 700,
+                                        color: '#1a1a1a',
+                                      }}
+                                    >
+                                      {formatCurrency(group.totalSum)}
+                                    </td>
+                                    <td
+                                      style={{
+                                        padding: '12px 16px',
+                                        textAlign: 'center',
+                                      }}
+                                      onClick={e => e.stopPropagation()}
+                                    >
+                                      <Space>
+                                        <Button
+                                          type="text"
+                                          size="small"
+                                          icon={<EditOutlined />}
+                                          onClick={e => {
+                                            e.stopPropagation()
+                                            handleEditGroup(group.id)
+                                          }}
+                                          style={{ color: '#1890ff' }}
+                                          title="Редактировать"
+                                        />
+                                        <Popconfirm
+                                          title="Удалить расценку?"
+                                          description="Это действие нельзя отменить"
+                                          onConfirm={e => {
+                                            e?.stopPropagation()
+                                            handleDeleteGroup(group.id)
+                                          }}
+                                          okText="Да"
+                                          cancelText="Отмена"
+                                          onClick={e => e?.stopPropagation()}
+                                        >
+                                          <Button
+                                            type="text"
+                                            size="small"
+                                            danger
+                                            icon={<DeleteOutlined />}
+                                            onClick={e => e.stopPropagation()}
+                                            title="Удалить"
+                                          />
+                                        </Popconfirm>
+                                      </Space>
+                                    </td>
+                                  </tr>
+
+                                  {/* Расширенная информация о материалах */}
+                                  {isExpanded && group.materials.length > 0 && (
+                                    <tr
+                                      style={{
+                                        backgroundColor: `${categoryOption.color}05`,
+                                      }}
+                                    >
+                                      <td
+                                        colSpan={7}
+                                        style={{
+                                          padding: '16px',
+                                          border: 'none',
+                                        }}
+                                      >
+                                        <div
+                                          style={{
+                                            display: 'grid',
+                                            gridTemplateColumns:
+                                              'repeat(auto-fit, minmax(300px, 1fr))',
+                                            gap: 12,
+                                          }}
+                                        >
+                                          {group.materials.map(
+                                            (material, matIndex) => (
+                                              <div
+                                                key={matIndex}
+                                                style={{
+                                                  padding: '12px',
+                                                  backgroundColor: 'white',
+                                                  borderRadius: 8,
+                                                  border: '1px solid #e9ecef',
+                                                  boxShadow:
+                                                    '0 1px 3px rgba(0,0,0,0.1)',
+                                                }}
+                                              >
+                                                <div
+                                                  style={{
+                                                    display: 'flex',
+                                                    justifyContent:
+                                                      'space-between',
+                                                    alignItems: 'flex-start',
+                                                    marginBottom: 8,
+                                                  }}
+                                                >
+                                                  <div style={{ flex: 1 }}>
+                                                    <div
+                                                      style={{
+                                                        fontSize: 13,
+                                                        fontWeight: 600,
+                                                        color: '#1a1a1a',
+                                                        marginBottom: 2,
+                                                      }}
+                                                    >
+                                                      {material.name}
+                                                    </div>
+                                                    <div
+                                                      style={{
+                                                        fontSize: 11,
+                                                        color: '#64748b',
+                                                      }}
+                                                    >
+                                                      {material.materialType &&
+                                                        `${material.materialType} • `}
+                                                      {material.volume}{' '}
+                                                      {material.unit} ×{' '}
+                                                      {material.consumptionRate}
+                                                    </div>
+                                                  </div>
+                                                  <div
+                                                    style={{
+                                                      textAlign: 'right',
+                                                    }}
+                                                  >
+                                                    <div
+                                                      style={{
+                                                        fontSize: 13,
+                                                        fontWeight: 600,
+                                                        color: '#52c41a',
+                                                      }}
+                                                    >
+                                                      {formatCurrency(
+                                                        material.total
+                                                      )}
+                                                    </div>
+                                                    <div
+                                                      style={{
+                                                        fontSize: 11,
+                                                        color: '#64748b',
+                                                      }}
+                                                    >
+                                                      {formatCurrency(
+                                                        material.materialPrice
+                                                      )}
+                                                      /{material.unit}
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            )
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </Card>
                   )}
-                  {expandedRates.has(group.id) && group.materials.length > 0 && (
-                    <tr style={{ backgroundColor: '#B0C4DE' }}>
-                      <td></td>
-                      <td colSpan={4} style={{
-                        padding: '4px 6px',
-                        paddingLeft: '15px',
-                        borderBottom: '1px solid #000',
-                        fontSize: '11px'
-                      }}>
-                        Материалы: {group.materials.map(m => `${m.name} (${m.volume} ${m.unit})`).join(', ')}
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
+                </div>
               )
-            })
-          )}
-        </table>
+            })}
+          </div>
+        )}
       </div>
-
 
       {/* Модальное окно добавления */}
       <AddRateModal
@@ -2013,7 +3002,9 @@ function Rates() {
                   <Form.Item
                     label="Код"
                     name="code"
-                    rules={[{ required: true, message: 'Введите код расценки' }]}
+                    rules={[
+                      { required: true, message: 'Введите код расценки' },
+                    ]}
                   >
                     <Input placeholder="Например: РАБ-001" />
                   </Form.Item>
@@ -2022,7 +3013,9 @@ function Rates() {
                   <Form.Item
                     label="Наименование"
                     name="name"
-                    rules={[{ required: true, message: 'Введите наименование' }]}
+                    rules={[
+                      { required: true, message: 'Введите наименование' },
+                    ]}
                   >
                     <Input placeholder="Название расценки" />
                   </Form.Item>
@@ -2081,7 +3074,27 @@ function Rates() {
                     name="category"
                     rules={[{ required: true, message: 'Выберите категорию' }]}
                   >
-                    <Select placeholder="Выберите категорию">
+                    <Select
+                      placeholder="Выберите категорию"
+                      onChange={newCategory => {
+                        // Регенерируем код при изменении категории (только для новых расценок)
+                        if (!editingRate) {
+                          const existingCodes = rates.map(r => r.code)
+                          const generatedCode = generateRateCode(
+                            newCategory,
+                            existingCodes
+                          )
+                          form.setFieldsValue({ code: generatedCode })
+
+                          console.log('Category changed, code regenerated:', {
+                            action: 'category_change_code_regenerate',
+                            newCategory,
+                            generatedCode,
+                            timestamp: new Date().toISOString(),
+                          })
+                        }
+                      }}
+                    >
                       {categoryOptions.map(cat => (
                         <Select.Option key={cat.value} value={cat.value}>
                           <Tag color={cat.color}>{cat.label}</Tag>
@@ -2098,8 +3111,15 @@ function Rates() {
                   </Form.Item>
                 </Col>
                 <Col span={12}>
-                  <Form.Item label="Активность" name="is_active" valuePropName="checked">
-                    <Switch checkedChildren="Активна" unCheckedChildren="Неактивна" />
+                  <Form.Item
+                    label="Активность"
+                    name="is_active"
+                    valuePropName="checked"
+                  >
+                    <Switch
+                      checkedChildren="Активна"
+                      unCheckedChildren="Неактивна"
+                    />
                   </Form.Item>
                 </Col>
               </Row>
@@ -2121,21 +3141,35 @@ function Rates() {
             <div style={{ marginBottom: 16 }}>
               <Select
                 showSearch
+                allowClear
                 style={{ width: '100%' }}
-                placeholder="Добавить материал из справочника"
+                placeholder={
+                  materialsLoading
+                    ? 'Загрузка материалов...'
+                    : 'Добавить материал из справочника'
+                }
                 optionFilterProp="children"
                 onChange={addMaterialFromCatalog}
-                value={undefined}
+                value={selectedCatalogMaterial}
+                disabled={materialsLoading || materials.length === 0}
                 filterOption={(input, option) =>
                   (option?.children || '')
                     .toString()
                     .toLowerCase()
                     .includes(input.toLowerCase())
                 }
+                notFoundContent={
+                  materialsLoading
+                    ? 'Загрузка...'
+                    : materials.length === 0
+                      ? 'Нет материалов в справочнике'
+                      : 'Не найдено'
+                }
               >
                 {materials.map(material => (
                   <Select.Option key={material.id} value={material.id}>
-                    {material.code} - {material.name} ({material.unit_short_name})
+                    {material.code} - {material.name} (
+                    {material.unit_short_name})
                   </Select.Option>
                 ))}
               </Select>
@@ -2143,32 +3177,56 @@ function Rates() {
 
             <div style={{ maxHeight: 400, overflowY: 'auto' }}>
               {tempRateMaterials.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 20, color: '#999' }}>
+                <div
+                  style={{ textAlign: 'center', padding: 20, color: '#999' }}
+                >
                   Материалы не добавлены
                 </div>
               ) : (
                 tempRateMaterials.map((material, index) => (
-                  <Card key={material.id} size="small" style={{ marginBottom: 8 }}>
+                  <Card
+                    key={material.id}
+                    size="small"
+                    style={{ marginBottom: 8 }}
+                  >
                     <Row gutter={16}>
                       <Col span={6}>
                         <Input
                           placeholder="Код"
                           value={material.code}
-                          onChange={e => updateTempMaterial(material.id, 'code', e.target.value)}
+                          onChange={e =>
+                            updateTempMaterial(
+                              material.id,
+                              'code',
+                              e.target.value
+                            )
+                          }
                         />
                       </Col>
                       <Col span={10}>
                         <Input
                           placeholder="Наименование"
                           value={material.name}
-                          onChange={e => updateTempMaterial(material.id, 'name', e.target.value)}
+                          onChange={e =>
+                            updateTempMaterial(
+                              material.id,
+                              'name',
+                              e.target.value
+                            )
+                          }
                         />
                       </Col>
                       <Col span={3}>
                         <InputNumber
                           placeholder="Расход"
                           value={material.consumption}
-                          onChange={value => updateTempMaterial(material.id, 'consumption', value)}
+                          onChange={value =>
+                            updateTempMaterial(
+                              material.id,
+                              'consumption',
+                              value
+                            )
+                          }
                           min={0}
                           step={0.01}
                           style={{ width: '100%' }}
@@ -2178,7 +3236,13 @@ function Rates() {
                         <InputNumber
                           placeholder="Цена"
                           value={material.last_purchase_price}
-                          onChange={value => updateTempMaterial(material.id, 'last_purchase_price', value)}
+                          onChange={value =>
+                            updateTempMaterial(
+                              material.id,
+                              'last_purchase_price',
+                              value
+                            )
+                          }
                           min={0}
                           step={0.01}
                           style={{ width: '100%' }}
@@ -2307,12 +3371,15 @@ function Rates() {
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item label="Активность" name="is_active" valuePropName="checked">
+          <Form.Item
+            label="Активность"
+            name="is_active"
+            valuePropName="checked"
+          >
             <Switch checkedChildren="Активен" unCheckedChildren="Неактивен" />
           </Form.Item>
         </Form>
       </Modal>
-
     </div>
   )
 }

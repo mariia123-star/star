@@ -10,7 +10,13 @@ import {
   message,
   Popconfirm,
 } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, TagsOutlined } from '@ant-design/icons'
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  TagsOutlined,
+} from '@ant-design/icons'
+import { materialTypesData } from '@/entities/material-types'
 
 const { Title } = Typography
 
@@ -25,27 +31,9 @@ interface MaterialFormData {
   short_name: string
 }
 
-const initialMaterialTypes: MaterialType[] = [
-  {
-    id: '1',
-    name: 'Основной материал',
-    short_name: 'основ',
-  },
-  {
-    id: '2',
-    name: 'Вспомогательный материал',
-    short_name: 'вспом',
-  },
-  {
-    id: '3',
-    name: 'Расходный материал',
-    short_name: 'расход',
-  },
-]
-
 function MaterialTypes() {
   const [materialTypes, setMaterialTypes] =
-    useState<MaterialType[]>(initialMaterialTypes)
+    useState<MaterialType[]>(materialTypesData)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingMaterial, setEditingMaterial] = useState<MaterialType | null>(
     null
@@ -181,7 +169,15 @@ function MaterialTypes() {
               <TagsOutlined />
             </div>
             <div>
-              <Title level={2} style={{ margin: 0, color: '#1a1a1a', fontSize: 28, fontWeight: 700 }}>
+              <Title
+                level={2}
+                style={{
+                  margin: 0,
+                  color: '#1a1a1a',
+                  fontSize: 28,
+                  fontWeight: 700,
+                }}
+              >
                 Типы материалов
               </Title>
               <div style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>

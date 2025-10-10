@@ -26,6 +26,10 @@ import {
   FileExcelOutlined,
   UploadOutlined,
   AppstoreOutlined,
+  DownOutlined,
+  RightOutlined,
+  GoogleOutlined,
+  LinkOutlined,
 } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -37,6 +41,7 @@ import {
 } from '@/entities/materials'
 import { unitsApi } from '@/entities/units'
 import * as XLSX from 'xlsx'
+import { generateMaterialCode } from '@/shared/utils/codeGenerator'
 
 const { Title } = Typography
 const { Search } = Input
@@ -65,10 +70,21 @@ function Materials() {
   const [categoryFilter, setCategoryFilter] = useState<string>()
   const [importData, setImportData] = useState<MaterialImportRow[]>([])
   const [isImporting, setIsImporting] = useState(false)
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    new Set()
+  )
+  const [googleSheetsModalVisible, setGoogleSheetsModalVisible] =
+    useState(false)
+  const [googleSheetsUrl, setGoogleSheetsUrl] = useState('')
+  const [isAnalyzingSheet, setIsAnalyzingSheet] = useState(false)
 
   const queryClient = useQueryClient()
 
-  const { data: materials = [], isLoading, error: materialsError } = useQuery({
+  const {
+    data: materials = [],
+    isLoading,
+    error: materialsError,
+  } = useQuery({
     queryKey: ['materials'],
     queryFn: materialsApi.getAll,
   })
@@ -168,6 +184,24 @@ function Materials() {
     },
   })
 
+  const toggleCategoryExpansion = (categoryValue: string) => {
+    console.log('Toggle category expansion', {
+      action: 'toggle_category_expansion',
+      category: categoryValue,
+      timestamp: new Date().toISOString(),
+    })
+
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(categoryValue)) {
+        newSet.delete(categoryValue)
+      } else {
+        newSet.add(categoryValue)
+      }
+      return newSet
+    })
+  }
+
   const handleAdd = () => {
     console.log('Add material clicked', {
       action: 'add_material',
@@ -176,9 +210,38 @@ function Materials() {
 
     setEditingMaterial(null)
     form.resetFields()
+
+    const defaultCategory = MATERIAL_CATEGORY_OPTIONS[0].value
+    // Генерируем код автоматически
+    const existingCodes = materials.map(m => m.code)
+    const generatedCode = generateMaterialCode(defaultCategory, existingCodes)
+
     form.setFieldsValue({
       is_active: true,
-      category: MATERIAL_CATEGORY_OPTIONS[0].value,
+      category: defaultCategory,
+      code: generatedCode,
+    })
+    setIsModalOpen(true)
+  }
+
+  const handleAddToCategory = (categoryValue: string) => {
+    console.log('Add material to category clicked', {
+      action: 'add_material_to_category',
+      category: categoryValue,
+      timestamp: new Date().toISOString(),
+    })
+
+    setEditingMaterial(null)
+    form.resetFields()
+
+    // Генерируем код автоматически для выбранной категории
+    const existingCodes = materials.map(m => m.code)
+    const generatedCode = generateMaterialCode(categoryValue, existingCodes)
+
+    form.setFieldsValue({
+      is_active: true,
+      category: categoryValue,
+      code: generatedCode,
     })
     setIsModalOpen(true)
   }
@@ -294,14 +357,19 @@ function Materials() {
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
       'application/vnd.ms-excel', // .xls
     ]
-    
-    if (!allowedTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls)$/i)) {
+
+    if (
+      !allowedTypes.includes(file.type) &&
+      !file.name.match(/\.(xlsx|xls)$/i)
+    ) {
       console.error('Invalid file type:', {
         fileName: file.name,
         fileType: file.type,
         allowedTypes,
       })
-      message.error('Пожалуйста, выберите файл в формате Excel (.xlsx или .xls)')
+      message.error(
+        'Пожалуйста, выберите файл в формате Excel (.xlsx или .xls)'
+      )
       return false
     }
 
@@ -319,12 +387,12 @@ function Materials() {
 
     // eslint-disable-next-line no-undef
     const reader = new FileReader()
-    
+
     reader.onerror = () => {
       console.error('FileReader error:', reader.error)
       message.error('Ошибка при чтении файла')
     }
-    
+
     reader.onload = e => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer)
@@ -356,8 +424,11 @@ function Materials() {
               category: String(row[3] || 'other').trim(),
               unit_name: String(row[4] || '').trim(),
               last_purchase_price:
-                typeof row[5] === 'number' ? row[5] : 
-                typeof row[5] === 'string' && !isNaN(Number(row[5])) ? Number(row[5]) : undefined,
+                typeof row[5] === 'number'
+                  ? row[5]
+                  : typeof row[5] === 'string' && !isNaN(Number(row[5]))
+                    ? Number(row[5])
+                    : undefined,
               supplier: row[6] ? String(row[6]).trim() : undefined,
               supplier_article: row[7] ? String(row[7]).trim() : undefined,
             }
@@ -377,9 +448,13 @@ function Materials() {
             }
 
             // Валидация категории
-            const validCategories = MATERIAL_CATEGORY_OPTIONS.map(opt => opt.value)
-            if (!validCategories.includes(rowData.category as any)) {
-              console.warn(`Строка ${i + 1}: неизвестная категория '${rowData.category}', использована 'other'`)
+            const validCategories = MATERIAL_CATEGORY_OPTIONS.map(
+              opt => opt.value
+            )
+            if (!validCategories.includes(rowData.category as string)) {
+              console.warn(
+                `Строка ${i + 1}: неизвестная категория '${rowData.category}', использована 'other'`
+              )
               rowData.category = 'other'
             }
 
@@ -409,27 +484,174 @@ function Materials() {
         console.error('Excel parsing error:', {
           error,
           fileName: file.name,
-          errorMessage: error instanceof Error ? error.message : 'Unknown error',
+          errorMessage:
+            error instanceof Error ? error.message : 'Unknown error',
           timestamp: new Date().toISOString(),
         })
-        
+
         let errorMessage = 'Ошибка при обработке Excel файла'
         if (error instanceof Error) {
           if (error.message.includes('Unsupported file')) {
-            errorMessage = 'Неподдерживаемый формат файла. Используйте .xlsx или .xls'
+            errorMessage =
+              'Неподдерживаемый формат файла. Используйте .xlsx или .xls'
           } else if (error.message.includes('Invalid workbook')) {
             errorMessage = 'Файл поврежден или имеет неверный формат'
           } else {
             errorMessage = `Ошибка обработки: ${error.message}`
           }
         }
-        
+
         message.error(errorMessage)
         setImportData([])
       }
     }
     reader.readAsArrayBuffer(file)
     return false // Предотвращаем автоматическую загрузку
+  }
+
+  const parseCsvData = async (csvText: string) => {
+    try {
+      const lines = csvText.split('\n').filter(line => line.trim())
+
+      if (lines.length < 2) {
+        throw new Error(
+          'CSV файл должен содержать заголовок и хотя бы одну строку данных'
+        )
+      }
+
+      const positions = []
+
+      // Пропускаем заголовок (первую строку)
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim()
+        if (!line) continue
+
+        // Парсим CSV строку (разделение по запятой, учитываем кавычки)
+        const cells = line.split(',').map(cell => {
+          // Убираем кавычки в начале и конце
+          return cell.trim().replace(/^"|"$/g, '')
+        })
+
+        if (cells.length >= 3) {
+          const material = {
+            name: cells[0] || '',
+            unit: cells[1] || 'шт',
+            category: cells[2] || 'other',
+            price: cells[3] ? parseFloat(cells[3].replace(',', '.')) : 0,
+          }
+
+          // Проверяем что у нас есть хотя бы название
+          if (material.name) {
+            positions.push(material)
+          }
+        }
+      }
+
+      console.log('Parsed materials from CSV:', positions)
+
+      return {
+        success: true,
+        positions,
+        message: `Успешно обработано ${positions.length} материалов`,
+      }
+    } catch (error) {
+      console.error('Error parsing CSV:', error)
+      return {
+        success: false,
+        positions: [],
+        message: error instanceof Error ? error.message : 'Ошибка парсинга CSV',
+      }
+    }
+  }
+
+  const handleGoogleSheetsImport = async () => {
+    if (!googleSheetsUrl.trim()) {
+      message.warning('Введите ссылку на Google Sheets')
+      return
+    }
+
+    setIsAnalyzingSheet(true)
+    try {
+      console.log('Google Sheets import started', {
+        action: 'google_sheets_import_start',
+        url: googleSheetsUrl,
+        timestamp: new Date().toISOString(),
+      })
+
+      // Преобразуем URL Google Sheets в CSV формат
+      const csvUrl = googleSheetsUrl
+        .replace('/edit#gid=', '/export?format=csv&gid=')
+        .replace('/edit?gid=', '/export?format=csv&gid=')
+
+      console.log('Fetching CSV from:', csvUrl)
+
+      // Получаем данные из Google Sheets как CSV
+      const response = await window.fetch(csvUrl)
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const csvText = await response.text()
+
+      // Парсим CSV данные
+      const data = await parseCsvData(csvText)
+
+      console.log('Google Sheets import response', {
+        success: data.success,
+        materialsCount: data.positions?.length || 0,
+        timestamp: new Date().toISOString(),
+      })
+
+      if (data.success && data.positions) {
+        // Преобразуем данные из CSV в формат MaterialImportRow
+        interface CsvMaterial {
+          name: string
+          unit: string
+          category: string
+          price: number
+        }
+
+        const importedMaterials: MaterialImportRow[] = data.positions.map(
+          (material: CsvMaterial) => ({
+            code: `GS-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            name: material.name || 'Импортированный материал',
+            description: `Импортировано из Google Sheets`,
+            category: material.category || 'other',
+            unit_name: material.unit || 'шт',
+            last_purchase_price: material.price || 0,
+            supplier: 'Google Sheets Import',
+            supplier_article: undefined,
+          })
+        )
+
+        // Добавляем к существующим данным импорта
+        setImportData(prev => [...prev, ...importedMaterials])
+
+        message.success(
+          `Успешно импортировано ${importedMaterials.length} материалов из Google Sheets`
+        )
+        setGoogleSheetsModalVisible(false)
+        setGoogleSheetsUrl('')
+      } else {
+        // Проверяем специфичные ошибки
+        let errorMessage = data.message || 'Ошибка импорта из Google Sheets'
+
+        if (data.message && data.message.includes('Unauthorized')) {
+          errorMessage =
+            '❌ Таблица не опубликована. Откройте Google Sheets → Файл → Опубликовать в интернете'
+        } else if (data.message && data.message.includes('Not Found')) {
+          errorMessage = '❌ Таблица не найдена. Проверьте правильность ссылки'
+        }
+
+        message.error(errorMessage)
+      }
+    } catch (error) {
+      console.error('Google Sheets import error:', error)
+      message.error(`Ошибка соединения с сервером: ${error}`)
+    } finally {
+      setIsAnalyzingSheet(false)
+    }
   }
 
   const handleImport = () => {
@@ -450,7 +672,7 @@ function Materials() {
     const invalidItems = importData.filter(
       item => !item.code || !item.name || !item.unit_name
     )
-    
+
     if (invalidItems.length > 0) {
       console.error('Invalid items found:', invalidItems)
       message.error(
@@ -629,7 +851,15 @@ function Materials() {
               <AppstoreOutlined />
             </div>
             <div>
-              <Title level={2} style={{ margin: 0, color: '#1a1a1a', fontSize: 28, fontWeight: 700 }}>
+              <Title
+                level={2}
+                style={{
+                  margin: 0,
+                  color: '#1a1a1a',
+                  fontSize: 28,
+                  fontWeight: 700,
+                }}
+              >
                 Сборник материалов
               </Title>
               <div style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>
@@ -652,11 +882,25 @@ function Materials() {
             >
               Импорт из Excel
             </Button>
-            <Button 
-              type="primary" 
+            <Button
+              size="large"
+              icon={<GoogleOutlined />}
+              onClick={() => setGoogleSheetsModalVisible(true)}
+              style={{
+                borderRadius: 10,
+                height: 44,
+                borderColor: '#4285f4',
+                color: '#4285f4',
+                fontWeight: 600,
+              }}
+            >
+              Google Sheets
+            </Button>
+            <Button
+              type="primary"
               size="large"
               className="modern-add-button rates"
-              icon={<PlusOutlined />} 
+              icon={<PlusOutlined />}
               onClick={handleAdd}
             >
               Добавить материал
@@ -664,11 +908,14 @@ function Materials() {
           </Space>
         </div>
 
-        <Card size="small" style={{
-          background: '#f8fafc',
-          border: '1px solid #e2e8f0',
-          borderRadius: 12
-        }}>
+        <Card
+          size="small"
+          style={{
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: 12,
+          }}
+        >
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={12} md={8} lg={6}>
               <Search
@@ -715,28 +962,117 @@ function Materials() {
             Ошибка загрузки единиц измерения: {unitsError.message}
           </div>
         )}
-        <Table
-          className="modern-table"
-          columns={columns}
-          dataSource={filteredMaterials}
-          loading={isLoading}
-          rowKey="id"
-          size="middle"
-          pagination={{
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) =>
-              `${range[0]}-${range[1]} из ${total} записей`,
-            pageSizeOptions: ['10', '20', '50', '100'],
-            defaultPageSize: 20,
-            position: ['topRight', 'bottomRight'],
-          }}
-          scroll={{
-            x: 'max-content',
-            y: 'calc(100vh - 400px)',
-          }}
-          sticky
-        />
+        <div className="materials-categories-container">
+          {MATERIAL_CATEGORY_OPTIONS.map(category => {
+            const categoryMaterials = filteredMaterials.filter(
+              material => material.category === category.value
+            )
+            const isExpanded = expandedCategories.has(category.value)
+            const hasMaterials = categoryMaterials.length > 0
+
+            return (
+              <div key={category.value} className="category-section">
+                <Card
+                  className="rates-card"
+                  size="small"
+                  style={{
+                    marginBottom: 16,
+                    background: isExpanded ? '#fafafa' : '#ffffff',
+                    borderColor: category.color,
+                    borderWidth: 2,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      padding: '8px 0',
+                    }}
+                    onClick={() => toggleCategoryExpansion(category.value)}
+                  >
+                    <div
+                      style={{ display: 'flex', alignItems: 'center', gap: 12 }}
+                    >
+                      {isExpanded ? (
+                        <DownOutlined style={{ color: category.color }} />
+                      ) : (
+                        <RightOutlined style={{ color: category.color }} />
+                      )}
+                      <Tag
+                        color={category.color}
+                        style={{ fontSize: 14, fontWeight: 600 }}
+                      >
+                        {category.label}
+                      </Tag>
+                      <span style={{ fontWeight: 500, color: '#595959' }}>
+                        ({categoryMaterials.length} материалов)
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <Button
+                        type="primary"
+                        size="small"
+                        icon={<PlusOutlined />}
+                        onClick={e => {
+                          e.stopPropagation()
+                          handleAddToCategory(category.value)
+                        }}
+                        style={{
+                          background: category.color,
+                          borderColor: category.color,
+                        }}
+                      >
+                        Добавить материал
+                      </Button>
+                    </div>
+                  </div>
+
+                  {isExpanded && hasMaterials && (
+                    <div style={{ marginTop: 16 }}>
+                      <Table
+                        className="modern-table"
+                        columns={columns}
+                        dataSource={categoryMaterials}
+                        loading={isLoading}
+                        rowKey="id"
+                        size="small"
+                        pagination={{
+                          showSizeChanger: true,
+                          showQuickJumper: true,
+                          showTotal: (total, range) =>
+                            `${range[0]}-${range[1]} из ${total} записей`,
+                          pageSizeOptions: ['5', '10', '20', '50'],
+                          defaultPageSize: 10,
+                          position: ['bottomRight'],
+                        }}
+                        scroll={{
+                          x: 'max-content',
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {isExpanded && !hasMaterials && (
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        padding: '24px 0',
+                        color: '#999',
+                        marginTop: 16,
+                        background: '#fafafa',
+                        borderRadius: 8,
+                      }}
+                    >
+                      В этой категории пока нет материалов
+                    </div>
+                  )}
+                </Card>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       {/* Модальное окно редактирования/создания */}
@@ -834,7 +1170,27 @@ function Materials() {
                   { required: true, message: 'Пожалуйста, выберите категорию' },
                 ]}
               >
-                <Select placeholder="Выберите категорию">
+                <Select
+                  placeholder="Выберите категорию"
+                  onChange={newCategory => {
+                    // Регенерируем код при изменении категории (только для новых материалов)
+                    if (!editingMaterial) {
+                      const existingCodes = materials.map(m => m.code)
+                      const generatedCode = generateMaterialCode(
+                        newCategory,
+                        existingCodes
+                      )
+                      form.setFieldsValue({ code: generatedCode })
+
+                      console.log('Category changed, code regenerated:', {
+                        action: 'category_change_code_regenerate',
+                        newCategory,
+                        generatedCode,
+                        timestamp: new Date().toISOString(),
+                      })
+                    }
+                  }}
+                >
                   {MATERIAL_CATEGORY_OPTIONS.map(category => (
                     <Select.Option key={category.value} value={category.value}>
                       <Tag color={category.color}>{category.label}</Tag>
@@ -932,7 +1288,7 @@ function Materials() {
         <div style={{ marginBottom: 16 }}>
           <Upload
             accept=".xlsx,.xls"
-            beforeUpload={(file) => {
+            beforeUpload={file => {
               console.log('Upload beforeUpload triggered', {
                 fileName: file.name,
                 fileType: file.type,
@@ -982,6 +1338,155 @@ function Materials() {
             ]}
           />
         )}
+      </Modal>
+
+      {/* Модальное окно для импорта из Google Sheets */}
+      <Modal
+        title={
+          <span>
+            <GoogleOutlined style={{ marginRight: 8, color: '#4285f4' }} />
+            Импорт материалов из Google Sheets
+          </span>
+        }
+        open={googleSheetsModalVisible}
+        onCancel={() => {
+          setGoogleSheetsModalVisible(false)
+          setGoogleSheetsUrl('')
+        }}
+        width={800}
+        footer={[
+          <Button
+            key="cancel"
+            onClick={() => {
+              setGoogleSheetsModalVisible(false)
+              setGoogleSheetsUrl('')
+            }}
+          >
+            Отмена
+          </Button>,
+          <Button
+            key="import"
+            type="primary"
+            icon={<FileExcelOutlined />}
+            loading={isAnalyzingSheet}
+            onClick={handleGoogleSheetsImport}
+            disabled={!googleSheetsUrl.trim()}
+          >
+            Импортировать материалы
+          </Button>,
+        ]}
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size="large">
+          <div>
+            <h4>Инструкция по импорту материалов:</h4>
+            <ol>
+              <li>Откройте Google Sheets документ с данными о материалах</li>
+              <li>Скопируйте полную ссылку из адресной строки браузера</li>
+              <li>Вставьте ссылку в поле ниже</li>
+              <li>Нажмите "Импортировать материалы"</li>
+            </ol>
+          </div>
+
+          <Input
+            size="large"
+            placeholder="https://docs.google.com/spreadsheets/d/..."
+            prefix={<LinkOutlined />}
+            value={googleSheetsUrl}
+            onChange={e => setGoogleSheetsUrl(e.target.value)}
+          />
+
+          <Card
+            size="small"
+            style={{ backgroundColor: '#fff7e6', borderColor: '#faad14' }}
+          >
+            <h4 style={{ color: '#fa8c16' }}>🔒 ВАЖНО! Настройка доступа:</h4>
+            <p style={{ fontSize: '12px', marginBottom: 8, color: '#fa8c16' }}>
+              <strong>Без публикации таблицы импорт не будет работать!</strong>
+            </p>
+            <ol style={{ marginBottom: 8, fontSize: '12px' }}>
+              <li>
+                <strong>Откройте Google Sheets с данными</strong>
+              </li>
+              <li>
+                Нажмите <strong>"Файл" → "Опубликовать в интернете"</strong>
+              </li>
+              <li>
+                Выберите <strong>"Весь документ"</strong> и формат{' '}
+                <strong>"Веб-страница"</strong>
+              </li>
+              <li>
+                Нажмите <strong>"Опубликовать"</strong> и подтвердите публикацию
+              </li>
+              <li>Скопируйте ссылку на таблицу из адресной строки браузера</li>
+            </ol>
+            <p style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: 0 }}>
+              💡 Если получаете ошибку "Unauthorized", значит таблица не
+              опубликована
+            </p>
+          </Card>
+
+          <Card size="small" style={{ backgroundColor: '#f5f5f5' }}>
+            <h4>Ожидаемый формат данных:</h4>
+            <ul style={{ marginBottom: 0, fontSize: '12px' }}>
+              <li>
+                <strong>Код материала</strong> - уникальный идентификатор
+              </li>
+              <li>
+                <strong>Наименование</strong> - название материала
+              </li>
+              <li>
+                <strong>Описание</strong> - подробное описание (опционально)
+              </li>
+              <li>
+                <strong>Категория</strong> - тип материала (бетон, металл,
+                кирпич и т.д.)
+              </li>
+              <li>
+                <strong>Единица измерения</strong> - м, м², м³, кг, шт и т.д.
+              </li>
+              <li>
+                <strong>Цена</strong> - стоимость за единицу
+              </li>
+              <li>
+                <strong>Поставщик</strong> - название поставщика (опционально)
+              </li>
+              <li>
+                <strong>Артикул</strong> - артикул поставщика (опционально)
+              </li>
+            </ul>
+          </Card>
+
+          <Card size="small" style={{ backgroundColor: '#e6f7ff' }}>
+            <h4>Поддерживаемые категории материалов:</h4>
+            <ul
+              style={{
+                marginBottom: 0,
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: '4px',
+              }}
+            >
+              {MATERIAL_CATEGORY_OPTIONS.map(category => (
+                <li key={category.value}>
+                  <Tag color={category.color}>{category.label}</Tag>
+                </li>
+              ))}
+            </ul>
+          </Card>
+
+          {isAnalyzingSheet && (
+            <Card size="small" style={{ backgroundColor: '#fff7e6' }}>
+              <h4>Процесс импорта:</h4>
+              <ol style={{ marginBottom: 0 }}>
+                <li>Подключение к документу...</li>
+                <li>Анализ структуры таблицы...</li>
+                <li>Извлечение данных о материалах...</li>
+                <li>Преобразование в формат системы...</li>
+                <li>Добавление в список импорта...</li>
+              </ol>
+            </Card>
+          )}
+        </Space>
       </Modal>
     </div>
   )

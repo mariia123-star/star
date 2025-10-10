@@ -7,11 +7,10 @@ html,
 body {
   margin: 0;
   padding: 0;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
-    'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  font-family: 'Times New Roman', Times, serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: linear-gradient(135deg, #f5f7fa 0%, #f0f2f5 100%);
 }
 
 #root {
@@ -19,13 +18,357 @@ body {
   height: 100vh;
 }
 
+/* Smooth animations globally */
+* {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Modern scrollbar for entire app */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f3f5;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 10px;
+  border: 2px solid #f1f3f5;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%);
+}
+
+/* Times New Roman для всех элементов */
+* {
+  font-family: 'Times New Roman', Times, serif !important;
+}
+
 /* Ant Design overrides for Russian locale */
 .ant-select-dropdown {
   z-index: 1050;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* Modern buttons */
+.ant-btn {
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ant-btn-primary {
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
+  border: none;
+  box-shadow: 0 4px 12px rgba(22, 119, 255, 0.3);
+}
+
+.ant-btn-primary:hover {
+  background: linear-gradient(135deg, #0958d9 0%, #0845c9 100%);
+  box-shadow: 0 6px 16px rgba(22, 119, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+.ant-btn-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(22, 119, 255, 0.3);
+}
+
+.ant-btn-default {
+  border: 1px solid #d9d9d9;
+  background: #fff;
+}
+
+.ant-btn-default:hover {
+  border-color: #1677ff;
+  color: #1677ff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Modern cards */
+.ant-card {
+  border-radius: 16px;
+  border: 1px solid #f0f0f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ant-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px);
+}
+
+.ant-card-head {
+  border-bottom: 1px solid #f0f0f0;
+  background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
+  border-radius: 16px 16px 0 0;
+}
+
+.ant-card-head-title {
+  font-weight: 600;
+}
+
+/* Modern modals */
+.ant-modal-content {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.15);
+}
+
+.ant-modal-header {
+  background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f5 100%);
+  border-bottom: 1px solid #f0f0f0;
+  border-radius: 16px 16px 0 0;
+}
+
+.ant-modal-title {
+  font-weight: 600;
+  font-size: 18px;
+}
+
+/* Modern inputs */
+.ant-input,
+.ant-input-number,
+.ant-select-selector {
+  border-radius: 8px;
+  border: 1px solid #d9d9d9;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ant-input:focus,
+.ant-input-number-focused .ant-input-number-input,
+.ant-select-focused .ant-select-selector {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
+}
+
+.ant-input:hover,
+.ant-input-number:hover,
+.ant-select:hover .ant-select-selector {
+  border-color: #4096ff;
 }
 
 .ant-table-thead > tr > th {
   white-space: nowrap;
+  font-weight: 600;
+  background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f5 100%);
+  transition: all 0.3s ease;
+}
+
+.ant-table-thead > tr > th:hover {
+  background: linear-gradient(135deg, #f0f2f5 0%, #e9ecef 100%);
+}
+
+.ant-table-tbody > tr {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ant-table-tbody > tr:hover {
+  background: #f8f9fa;
+  transform: scale(1.001);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.ant-table {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ant-table-wrapper {
+  animation: fadeIn 0.4s ease;
+}
+
+/* Modern typography */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.ant-typography h1,
+.ant-typography h2,
+.ant-typography h3,
+.ant-typography h4,
+.ant-typography h5,
+.ant-typography h6 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #1a1a1a;
+}
+
+.ant-typography {
+  color: #4a5568;
+  line-height: 1.7;
+}
+
+.ant-typography-secondary {
+  color: #718096;
+}
+
+/* Modern spacing */
+.ant-space {
+  gap: 16px !important;
+}
+
+.ant-space-compact {
+  gap: 8px !important;
+}
+
+/* Loading states */
+.ant-spin {
+  color: #1677ff;
+}
+
+.ant-skeleton {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Badges and tags */
+.ant-badge {
+  font-weight: 600;
+}
+
+.ant-tag {
+  border-radius: 6px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border: none;
+}
+
+/* Dividers */
+.ant-divider {
+  border-color: #e5e7eb;
+  margin: 24px 0;
+}
+
+/* Form styling */
+.ant-form-item-label > label {
+  font-weight: 600;
+  color: #374151;
+}
+
+.ant-form-item {
+  margin-bottom: 24px;
+}
+
+.ant-checkbox-wrapper,
+.ant-radio-wrapper {
+  font-weight: 500;
+}
+
+/* Notifications and messages */
+.ant-message {
+  z-index: 99999;
+}
+
+.ant-message-notice-content {
+  border-radius: 12px;
+  padding: 12px 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  animation: slideDown 0.3s ease;
+}
+
+.ant-notification-notice {
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+  padding: 20px 24px;
+}
+
+/* Tabs */
+.ant-tabs-tab {
+  font-weight: 600;
+  transition: all 0.3s ease;
+  border-radius: 8px 8px 0 0;
+  padding: 12px 20px;
+}
+
+.ant-tabs-tab:hover {
+  color: #1677ff;
+  background: #f0f7ff;
+}
+
+.ant-tabs-tab-active {
+  background: linear-gradient(135deg, #f0f7ff 0%, #e6f4ff 100%);
+}
+
+.ant-tabs-ink-bar {
+  background: linear-gradient(90deg, #1677ff 0%, #4096ff 100%);
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+}
+
+/* Dropdown menus */
+.ant-dropdown {
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  animation: slideDown 0.3s ease;
+}
+
+.ant-dropdown-menu {
+  border-radius: 12px;
+  padding: 8px;
+}
+
+.ant-dropdown-menu-item {
+  border-radius: 8px;
+  margin: 2px 0;
+  transition: all 0.2s ease;
+}
+
+.ant-dropdown-menu-item:hover {
+  background: #f0f7ff;
+  color: #1677ff;
 }
 
 /* Row colors for chessboard */
@@ -385,4 +728,131 @@ body {
   border-radius: 12px !important;
   overflow: hidden !important;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Rates page categories container */
+.rates-categories-container {
+  padding: 16px 0;
+  overflow: auto;
+  height: 100%;
+}
+
+.category-section {
+  margin-bottom: 32px;
+}
+
+.category-section:last-child {
+  margin-bottom: 0;
+}
+
+/* Category table styling */
+.category-section table {
+  font-size: 13px;
+}
+
+.category-section table thead th {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.category-section table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.category-section table tbody td {
+  vertical-align: top;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+/* Mobile responsive adjustments for category tables */
+@media (max-width: 768px) {
+  .rates-categories-container {
+    padding: 8px 0;
+  }
+
+  .category-section {
+    margin-bottom: 24px;
+  }
+
+  .category-section table {
+    font-size: 12px;
+  }
+
+  .category-section table thead th,
+  .category-section table tbody td {
+    padding: 8px 12px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .category-section table thead th,
+  .category-section table tbody td {
+    padding: 6px 8px !important;
+    font-size: 11px;
+  }
+
+  .category-section table thead th:nth-child(n + 5),
+  .category-section table tbody td:nth-child(n + 5) {
+    display: none;
+  }
+}
+
+/* Rates card hover effects */
+.rates-card {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  border: 1px solid #f0f0f0;
+  height: fit-content;
+}
+
+.rates-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+/* Materials categories container */
+.materials-categories-container {
+  padding: 16px 0;
+  overflow: auto;
+  height: 100%;
+}
+
+/* Mobile responsive adjustments for rates page */
+@media (max-width: 768px) {
+  .modern-page-header .ant-row {
+    flex-direction: column;
+  }
+
+  .modern-page-header .ant-col {
+    margin-bottom: 12px;
+  }
+
+  .modern-page-title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    text-align: center;
+  }
+
+  .modern-page-icon {
+    align-self: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .modern-page-container {
+    height: calc(100vh - 120px);
+  }
+
+  .modern-page-header,
+  .modern-page-content {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .modern-page-title h2 {
+    font-size: 20px !important;
+  }
 }
