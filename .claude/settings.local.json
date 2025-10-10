@@ -43,7 +43,8 @@
       "Bash(taskkill:*)",
       "Bash(powershell -Command \"(Get-Content ''src/pages/developer/Rates.tsx'' -Raw) -replace ''\\[rates, allRateMaterials, rateMaterialsLoading\\]'', ''[rates, rawRateMaterials, rateMaterialsLoading]'' | Set-Content ''src/pages/developer/Rates.tsx''\")",
       "Bash(npm run format:check:*)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
