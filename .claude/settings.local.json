@@ -44,7 +44,10 @@
       "Bash(powershell -Command \"(Get-Content ''src/pages/developer/Rates.tsx'' -Raw) -replace ''\\[rates, allRateMaterials, rateMaterialsLoading\\]'', ''[rates, rawRateMaterials, rateMaterialsLoading]'' | Set-Content ''src/pages/developer/Rates.tsx''\")",
       "Bash(npm run format:check:*)",
       "Bash(powershell:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(GIT_SSH_COMMAND=\"ssh -i ~/.ssh/id_rsa_github -o IdentitiesOnly=yes\" git push origin main)",
+      "Bash(gh auth:*)",
+      "Read(//c/Users/pto125/**)"
     ],
     "deny": [],
     "ask": []
