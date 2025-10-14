@@ -32,6 +32,7 @@ import {
 } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
 import { ratesApi, rateMaterialsApi } from '@/entities/rates'
+import { unitsApi } from '@/entities/units'
 import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import {
@@ -61,6 +62,8 @@ interface ProcessedEstimateRow extends EstimateRow {
   matches?: RateMatchResult[]
   matchScore?: number
   validationErrors?: string[]
+  unit_id?: string // ID единицы измерения из справочника
+  unit_short_name?: string // Сокращенное название единицы для отображения
 }
 
 function EstimateImport() {
@@ -81,6 +84,12 @@ function EstimateImport() {
   const { data: rates = [], isLoading: ratesLoading } = useQuery({
     queryKey: ['rates'],
     queryFn: ratesApi.getAll,
+  })
+
+  // Загружаем справочник единиц измерения
+  const { data: units = [], isLoading: unitsLoading } = useQuery({
+    queryKey: ['units'],
+    queryFn: unitsApi.getAll,
   })
 
   console.log('EstimateImport page rendered', {
@@ -140,15 +149,25 @@ function EstimateImport() {
           }
 
           try {
+            const unitText = String(row[1] || '').trim()
+
+            // Находим соответствующую единицу измерения из справочника
+            const matchedUnit = units.find(u =>
+              u.name.toLowerCase() === unitText.toLowerCase() ||
+              u.short_name.toLowerCase() === unitText.toLowerCase()
+            )
+
             const estimateRow: ProcessedEstimateRow = {
               id: `row-${i}`,
               workName: String(row[0] || '').trim(),
-              unit: String(row[1] || '').trim(),
+              unit: matchedUnit ? matchedUnit.short_name : unitText, // Используем short_name из справочника
               volume: typeof row[2] === 'number' ? row[2] : parseFloat(String(row[2] || 0)),
               subcategory: row[3] ? String(row[3]).trim() : undefined,
               category: row[4] ? String(row[4]).trim() : undefined,
               description: row[5] ? String(row[5]).trim() : undefined,
               status: 'pending',
+              unit_id: matchedUnit?.id, // Сохраняем ID из справочника
+              unit_short_name: matchedUnit?.short_name || unitText, // Сохраняем сокращенное название
             }
 
             // Валидация обязательных полей с новыми правилами
@@ -550,9 +569,13 @@ function EstimateImport() {
     },
     {
       title: 'Ед.изм.',
-      dataIndex: 'unit',
+      dataIndex: 'unit_short_name',
       key: 'unit',
       width: 80,
+      render: (_: unknown, record: ProcessedEstimateRow) => {
+        // Отображаем сокращенное название из справочника
+        return record.unit_short_name || record.unit
+      },
     },
     {
       title: 'Объем',
