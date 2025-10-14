@@ -1,751 +1,1057 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import {
-  Card,
-  Steps,
   Button,
   Upload,
   Table,
-  Select,
-  Radio,
+  App,
+  Card,
+  Typography,
   Space,
-  message,
   Tag,
   Progress,
-  Descriptions,
-  Input,
-  Tooltip,
   Modal,
+  Radio,
+  Divider,
+  Alert,
+  Statistic,
+  Row,
+  Col,
+  Input,
+  Select,
 } from 'antd'
 import {
   UploadOutlined,
-  SearchOutlined,
+  FileExcelOutlined,
   CheckCircleOutlined,
+  WarningOutlined,
   CloseCircleOutlined,
-  QuestionCircleOutlined,
-  SyncOutlined,
+  InfoCircleOutlined,
+  RocketOutlined,
+  SendOutlined,
+  SearchOutlined,
 } from '@ant-design/icons'
-import type { UploadFile } from 'antd'
+import { useQuery } from '@tanstack/react-query'
+import { ratesApi, rateMaterialsApi } from '@/entities/rates'
+import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import {
-  findBestMatches,
-  manualSearch,
-  type MatchingMode,
-  type MatchResult,
-  type MatchingCriteria,
-} from '@/shared/lib/advancedMatching'
-import { materialsApi } from '@/entities/materials'
-import { ratesApi } from '@/entities/rates'
+  findMatchingRates,
+  getMatchQuality,
+  formatMatchInfo,
+  type EstimateRow,
+  type RateMatchResult,
+  type Rate,
+} from '@/shared/lib/rateMatching'
 
-const { Step } = Steps
+const { Title, Text, Paragraph } = Typography
 
-// ============================================================================
-// ТИПЫ
-// ============================================================================
-
-interface ImportedRow {
+interface ProcessedEstimateRow extends EstimateRow {
   id: string
-  name: string
-  description?: string
-  category?: string
-  article?: string
-  brand?: string
-  unit: string
-  quantity: number
-  price?: number
-  equipment_code?: string
-  manufacturer?: string
+  status:
+    | 'pending'
+    | 'exact_match'
+    | 'good_match'
+    | 'needs_review'
+    | 'no_match'
+  selectedRateId?: string
+  selectedRateName?: string
+  selectedRateCode?: string
+  matches?: RateMatchResult[]
+  matchScore?: number
 }
 
-interface MatchedRow extends ImportedRow {
-  matchedRate?: MatchResult<any>
-  matchedMaterial?: MatchResult<any>
-  matchStatus: 'matched' | 'partial' | 'unmatched' | 'manual'
-  manualSelection?: any
-}
+function EstimateImport() {
+  const navigate = useNavigate()
+  const { message } = App.useApp()
+  const [importData, setImportData] = useState<ProcessedEstimateRow[]>([])
+  const [processing, setProcessing] = useState(false)
+  const [processedCount, setProcessedCount] = useState(0)
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false)
+  const [currentReviewItem, setCurrentReviewItem] =
+    useState<ProcessedEstimateRow | null>(null)
+  const [autoMatchThreshold, setAutoMatchThreshold] = useState(0.9)
+  const [transferring, setTransferring] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string>('')
 
-// ============================================================================
-// КОМПОНЕНТ
-// ============================================================================
+  // Загружаем все активные расценки
+  const { data: rates = [], isLoading: ratesLoading } = useQuery({
+    queryKey: ['rates'],
+    queryFn: ratesApi.getAll,
+  })
 
-export default function EstimateImport() {
-  // Состояние шагов
-  const [current, setCurrent] = useState(0)
+  console.log('EstimateImport page rendered', {
+    action: 'page_render',
+    ratesCount: rates.length,
+    importDataCount: importData.length,
+    timestamp: new Date().toISOString(),
+  })
 
-  // Загрузка файла
-  const [fileList, setFileList] = useState<UploadFile[]>([])
-  const [importedData, setImportedData] = useState<ImportedRow[]>([])
+  // Фильтруем только активные расценки
+  const activeRates: Rate[] = rates.filter(r => r.is_active)
 
-  // Настройки сопоставления
-  const [matchingMode, setMatchingMode] = useState<MatchingMode>('optimized')
-  const [minScore, setMinScore] = useState(70)
-  const [categoryFilter, setCategoryFilter] = useState<string>()
+  // Получаем уникальные подкатегории
+  const uniqueSubcategories = Array.from(
+    new Set(activeRates.map(r => r.subcategory).filter(Boolean))
+  ).sort()
 
-  // Результаты сопоставления
-  const [matchedData, setMatchedData] = useState<MatchedRow[]>([])
-  const [loading, setLoading] = useState(false)
+  const handleFileUpload = (file: File): boolean => { // eslint-disable-line no-undef
+    console.log('Excel file upload started', {
+      action: 'estimate_import_file_upload',
+      fileName: file.name,
+      fileSize: file.size,
+      timestamp: new Date().toISOString(),
+    })
 
-  // Модальное окно ручного поиска
-  const [manualSearchVisible, setManualSearchVisible] = useState(false)
-  const [currentSearchRow, setCurrentSearchRow] = useState<MatchedRow | null>(
-    null
-  )
-  const [manualSearchQuery, setManualSearchQuery] = useState('')
-  const [manualSearchResults, setManualSearchResults] = useState<
-    MatchResult<any>[]
-  >([])
+    const reader = new FileReader() // eslint-disable-line no-undef
 
-  // Данные справочников
-  const [rates, setRates] = useState<any[]>([])
-  const [materials, setMaterials] = useState<any[]>([])
-
-  // ============================================================================
-  // ОБРАБОТЧИКИ ШАГОВ
-  // ============================================================================
-
-  // Шаг 1: Загрузка файла Excel
-  const handleFileUpload = async (file: File) => {
-    try {
-      const buffer = await file.arrayBuffer()
-      const workbook = XLSX.read(buffer)
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]]
-      const jsonData = XLSX.utils.sheet_to_json(worksheet)
-
-      console.log('Excel Import: File loaded', {
-        rows: jsonData.length,
-        timestamp: new Date().toISOString(),
-      })
-
-      // Преобразуем данные
-      const imported: ImportedRow[] = jsonData.map((row: any, index) => ({
-        id: `row-${index}`,
-        name: row['Наименование'] || row['Name'] || '',
-        description: row['Описание'] || row['Description'] || '',
-        category: row['Категория'] || row['Category'] || '',
-        article: row['Артикул'] || row['Article'] || '',
-        brand: row['Бренд'] || row['Brand'] || '',
-        unit: row['Единица'] || row['Unit'] || 'шт',
-        quantity: Number(row['Количество'] || row['Quantity'] || 0),
-        price: Number(row['Цена'] || row['Price'] || 0),
-        equipment_code: row['Код оборудования'] || row['Equipment Code'] || '',
-        manufacturer:
-          row['Производитель'] || row['Manufacturer'] || '',
-      }))
-
-      setImportedData(imported)
-      message.success(`Загружено ${imported.length} строк из Excel`)
-      setCurrent(1)
-    } catch (error) {
-      console.error('Excel import error:', error)
-      message.error('Ошибка при загрузке файла')
+    reader.onerror = () => {
+      console.error('FileReader error:', reader.error)
+      message.error('Ошибка при чтении файла')
     }
 
-    return false // Предотвращаем автоматическую загрузку
-  }
+    reader.onload = e => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer)
+        const workbook = XLSX.read(data, { type: 'array' })
+        const sheetName = workbook.SheetNames[0]
+        const worksheet = workbook.Sheets[sheetName]
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
 
-  // Шаг 2: Настройка и запуск сопоставления
-  const handleStartMatching = async () => {
-    setLoading(true)
-
-    try {
-      // Загружаем справочники
-      const [fetchedRates, fetchedMaterials] = await Promise.all([
-        ratesApi.getAll(),
-        materialsApi.getAll(),
-      ])
-
-      setRates(fetchedRates)
-      setMaterials(fetchedMaterials)
-
-      console.log('Loaded references:', {
-        rates: fetchedRates.length,
-        materials: fetchedMaterials.length,
-      })
-
-      // Сопоставляем каждую строку
-      const matched: MatchedRow[] = []
-
-      for (const row of importedData) {
-        const criteria: MatchingCriteria = {
-          name: row.name,
-          description: row.description,
-          category: row.category,
-          article: row.article,
-          brand: row.brand,
-          equipment_code: row.equipment_code,
-          manufacturer: row.manufacturer,
-        }
-
-        // Ищем расценку
-        const rateMatches = findBestMatches(criteria, fetchedRates, {
-          mode: matchingMode,
-          maxResults: 1,
-          minScore,
-          categoryFilter,
+        console.log('Excel file parsed', {
+          sheetName,
+          totalRows: jsonData.length,
+          timestamp: new Date().toISOString(),
         })
 
-        // Ищем материал
-        const materialMatches = findBestMatches(
-          criteria,
-          fetchedMaterials,
-          {
-            mode: matchingMode,
-            maxResults: 1,
-            minScore,
-            categoryFilter,
+        // Парсинг данных Excel
+        const parsedData: ProcessedEstimateRow[] = []
+
+        // Пропускаем заголовок (первая строка)
+        for (let i = 1; i < jsonData.length; i++) {
+          const row = jsonData[i] as (string | number)[]
+
+          // Пропускаем пустые строки
+          if (!row || row.length === 0 || row.every(cell => !cell)) {
+            continue
           }
-        )
 
-        // Определяем статус совпадения
-        let matchStatus: MatchedRow['matchStatus'] = 'unmatched'
-        if (
-          rateMatches.length > 0 &&
-          rateMatches[0].score >= minScore
-        ) {
-          matchStatus = 'matched'
-        } else if (
-          materialMatches.length > 0 &&
-          materialMatches[0].score >= minScore
-        ) {
-          matchStatus = 'partial'
+          try {
+            const estimateRow: ProcessedEstimateRow = {
+              id: `row-${i}`,
+              workName: String(row[0] || '').trim(),
+              unit: String(row[1] || '').trim(),
+              volume: typeof row[2] === 'number' ? row[2] : parseFloat(String(row[2] || 0)),
+              subcategory: row[3] ? String(row[3]).trim() : undefined,
+              category: row[4] ? String(row[4]).trim() : undefined,
+              description: row[5] ? String(row[5]).trim() : undefined,
+              status: 'pending',
+            }
+
+            // Валидация обязательных полей
+            if (!estimateRow.workName) {
+              console.warn(`Строка ${i + 1}: отсутствует наименование работ`)
+              continue
+            }
+            if (!estimateRow.unit) {
+              console.warn(`Строка ${i + 1}: отсутствует единица измерения`)
+              continue
+            }
+            if (!estimateRow.volume || estimateRow.volume <= 0) {
+              console.warn(`Строка ${i + 1}: некорректный объём`)
+              continue
+            }
+
+            parsedData.push(estimateRow)
+          } catch (error) {
+            console.error(`Ошибка парсинга строки ${i + 1}:`, error)
+          }
         }
 
-        matched.push({
-          ...row,
-          matchedRate: rateMatches[0],
-          matchedMaterial: materialMatches[0],
-          matchStatus,
+        if (parsedData.length === 0) {
+          message.error('Не удалось обработать ни одной строки. Проверьте формат файла.')
+          return
+        }
+
+        setImportData(parsedData)
+        message.success(`Загружено ${parsedData.length} позиций из Excel`)
+
+        console.log('Excel import successful', {
+          action: 'estimate_import_success',
+          rowCount: parsedData.length,
+          timestamp: new Date().toISOString(),
         })
+      } catch (error) {
+        console.error('Excel parsing error:', error)
+        message.error('Ошибка при обработке Excel файла')
       }
-
-      setMatchedData(matched)
-      message.success('Сопоставление завершено')
-      setCurrent(2)
-    } catch (error) {
-      console.error('Matching error:', error)
-      message.error('Ошибка при сопоставлении')
-    } finally {
-      setLoading(false)
     }
+
+    reader.readAsArrayBuffer(file)
+    return false
   }
 
-  // Ручной поиск
-  const handleManualSearch = (row: MatchedRow) => {
-    setCurrentSearchRow(row)
-    setManualSearchQuery(row.name)
-    setManualSearchVisible(true)
-
-    // Запускаем поиск сразу
-    performManualSearch(row.name)
-  }
-
-  const performManualSearch = async (query: string) => {
-    if (!query.trim()) {
-      setManualSearchResults([])
+  const handleAutoMatch = async () => {
+    if (activeRates.length === 0) {
+      message.error('Сборник расценок пуст. Добавьте расценки перед импортом.')
       return
     }
 
-    try {
-      // Ищем по расценкам
-      const results = manualSearch(query, rates, {
-        categoryFilter,
-        maxResults: 10,
-        minScore: 50,
+    setProcessing(true)
+    setProcessedCount(0)
+
+    console.log('Auto-matching started', {
+      action: 'estimate_auto_match_start',
+      itemsCount: importData.length,
+      ratesCount: activeRates.length,
+      threshold: autoMatchThreshold,
+      timestamp: new Date().toISOString(),
+    })
+
+    const processedData: ProcessedEstimateRow[] = []
+
+    for (let i = 0; i < importData.length; i++) {
+      const item = importData[i]
+
+      // Имитация асинхронности для отображения прогресса
+      await new Promise(resolve => setTimeout(resolve, 10)) // eslint-disable-line no-undef
+
+      // Поиск подходящих расценок
+      const matches = findMatchingRates(item, activeRates, 0.5)
+
+      let status: ProcessedEstimateRow['status'] = 'no_match'
+      let selectedRateId: string | undefined
+      let selectedRateName: string | undefined
+      let selectedRateCode: string | undefined
+      let matchScore: number | undefined
+
+      if (matches.length > 0) {
+        const bestMatch = matches[0]
+        const quality = getMatchQuality(bestMatch)
+
+        // Автоматически выбираем расценку если score выше порога
+        if (bestMatch.score >= autoMatchThreshold) {
+          status = quality === 'exact' ? 'exact_match' : 'good_match'
+          selectedRateId = bestMatch.rateId
+          selectedRateName = bestMatch.rateName
+          selectedRateCode = bestMatch.rateCode
+          matchScore = bestMatch.score
+        } else {
+          status = 'needs_review'
+        }
+      }
+
+      processedData.push({
+        ...item,
+        status,
+        selectedRateId,
+        selectedRateName,
+        selectedRateCode,
+        matches,
+        matchScore,
       })
 
-      setManualSearchResults(results)
-    } catch (error) {
-      console.error('Manual search error:', error)
-      message.error('Ошибка поиска')
+      setProcessedCount(i + 1)
     }
+
+    setImportData(processedData)
+    setProcessing(false)
+
+    const stats = {
+      exactMatch: processedData.filter(i => i.status === 'exact_match').length,
+      goodMatch: processedData.filter(i => i.status === 'good_match').length,
+      needsReview: processedData.filter(i => i.status === 'needs_review').length,
+      noMatch: processedData.filter(i => i.status === 'no_match').length,
+    }
+
+    console.log('Auto-matching completed', {
+      action: 'estimate_auto_match_complete',
+      stats,
+      timestamp: new Date().toISOString(),
+    })
+
+    message.success(
+      `Обработка завершена! Точных совпадений: ${stats.exactMatch}, Хороших: ${stats.goodMatch}, Требует проверки: ${stats.needsReview}, Без совпадений: ${stats.noMatch}`
+    )
   }
 
-  const handleSelectManualMatch = (matchResult: MatchResult<any>) => {
-    if (!currentSearchRow) return
+  const handleReviewItem = (item: ProcessedEstimateRow) => {
+    console.log('Review item clicked', {
+      action: 'review_item',
+      itemId: item.id,
+      workName: item.workName,
+      timestamp: new Date().toISOString(),
+    })
 
-    // Обновляем строку с ручным выбором
-    const updated = matchedData.map(row =>
-      row.id === currentSearchRow.id
+    // Сбросить поиск при открытии нового модального окна
+    setSearchTerm('')
+    setSelectedSubcategory('')
+    setCurrentReviewItem(item)
+    setIsReviewModalOpen(true)
+  }
+
+  // Фильтруем расценки для ручного выбора
+  const getFilteredRatesForManualSelection = () => {
+    if (!currentReviewItem) return []
+
+    let filteredRates = [...activeRates]
+
+    // Фильтр по подкатегории
+    if (selectedSubcategory) {
+      filteredRates = filteredRates.filter(
+        r => r.subcategory === selectedSubcategory
+      )
+    }
+
+    // Фильтр по поисковому запросу
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase()
+      filteredRates = filteredRates.filter(
+        r =>
+          r.name.toLowerCase().includes(searchLower) ||
+          r.code.toLowerCase().includes(searchLower) ||
+          r.description?.toLowerCase().includes(searchLower)
+      )
+    }
+
+    // Если есть найденные совпадения, показываем их в начале
+    if (currentReviewItem.matches && currentReviewItem.matches.length > 0) {
+      const matchedRateIds = new Set(
+        currentReviewItem.matches.map(m => m.rateId)
+      )
+      const matchedRates = filteredRates.filter(r => matchedRateIds.has(r.id))
+      const otherRates = filteredRates.filter(r => !matchedRateIds.has(r.id))
+      return [...matchedRates, ...otherRates]
+    }
+
+    return filteredRates
+  }
+
+  const handleSelectRate = (rateId: string) => {
+    if (!currentReviewItem) return
+
+    // Находим выбранную расценку в списке всех расценок
+    const selectedRate = activeRates.find(r => r.id === rateId)
+
+    if (!selectedRate) {
+      console.error('Rate not found', { rateId })
+      message.error('Расценка не найдена')
+      return
+    }
+
+    // Пытаемся найти score из автоматических совпадений (если есть)
+    const selectedMatch = currentReviewItem.matches?.find(m => m.rateId === rateId)
+    const matchScore = selectedMatch?.score || 0.5 // Для ручного выбора используем базовый score
+
+    console.log('Rate selected', {
+      action: 'rate_selected',
+      itemId: currentReviewItem.id,
+      rateId,
+      rateName: selectedRate.name,
+      isFromAutoMatch: !!selectedMatch,
+      timestamp: new Date().toISOString(),
+    })
+
+    const updatedData = importData.map(item =>
+      item.id === currentReviewItem.id
         ? {
-            ...row,
-            matchedRate: matchResult,
-            matchStatus: 'manual' as const,
-            manualSelection: matchResult.item,
+            ...item,
+            status: 'good_match' as const,
+            selectedRateId: selectedRate.id,
+            selectedRateName: selectedRate.name,
+            selectedRateCode: selectedRate.code,
+            matchScore: matchScore,
           }
-        : row
+        : item
     )
 
-    setMatchedData(updated)
-    setManualSearchVisible(false)
-    message.success('Расценка выбрана вручную')
+    setImportData(updatedData)
+    setIsReviewModalOpen(false)
+    setCurrentReviewItem(null)
+    message.success('Расценка выбрана')
   }
 
-  // Шаг 3: Импорт данных
-  const handleImport = async () => {
-    setLoading(true)
+  const handleSkipItem = () => {
+    if (!currentReviewItem) return
+
+    console.log('Item skipped', {
+      action: 'item_skipped',
+      itemId: currentReviewItem.id,
+      timestamp: new Date().toISOString(),
+    })
+
+    const updatedData = importData.map(item =>
+      item.id === currentReviewItem.id
+        ? { ...item, status: 'no_match' as const }
+        : item
+    )
+
+    setImportData(updatedData)
+    setIsReviewModalOpen(false)
+    setCurrentReviewItem(null)
+  }
+
+  const handleTransferToCalculator = async () => {
+    console.log('🚀 Transfer to calculator started', {
+      action: 'transfer_to_calculator',
+      totalImportData: importData.length,
+      importDataSample: importData.slice(0, 2),
+      timestamp: new Date().toISOString(),
+    })
+
+    setTransferring(true)
 
     try {
-      // TODO: Реализовать фактический импорт в БД
-      // Здесь будет логика создания тендерной сметы
-      // и сохранения всех позиций
+      // Фильтруем только успешно подобранные позиции
+      const matchedItems = importData.filter(
+        item =>
+          item.selectedRateId &&
+          (item.status === 'exact_match' || item.status === 'good_match')
+      )
 
-      message.success('Данные успешно импортированы!')
-      setCurrent(3)
+      console.log('✅ Matched items filtered', {
+        totalItems: importData.length,
+        matchedCount: matchedItems.length,
+        matchedItems: matchedItems.map(i => ({
+          id: i.id,
+          workName: i.workName,
+          status: i.status,
+          selectedRateId: i.selectedRateId,
+          volume: i.volume,
+        })),
+      })
+
+      if (matchedItems.length === 0) {
+        console.error('❌ No matched items found!', {
+          importData: importData.map(i => ({
+            id: i.id,
+            workName: i.workName,
+            status: i.status,
+            hasRateId: !!i.selectedRateId,
+          })),
+        })
+        message.warning('Нет подобранных расценок для переноса')
+        setTransferring(false)
+        return
+      }
+
+      console.log('📦 Items to transfer', {
+        count: matchedItems.length,
+        items: matchedItems.map(i => ({
+          workName: i.workName,
+          rateId: i.selectedRateId,
+          volume: i.volume,
+        })),
+      })
+
+      // Загружаем материалы для каждой расценки
+      const ratesWithMaterials = await Promise.all(
+        matchedItems.map(async item => {
+          try {
+            const rateId = item.selectedRateId!
+            const rate = rates.find(r => r.id === rateId)
+
+            if (!rate) {
+              console.warn('Rate not found', { rateId })
+              return null
+            }
+
+            // Загружаем материалы расценки
+            const rateMaterials = await rateMaterialsApi.getByRateId(rateId)
+
+            console.log('Rate materials loaded', {
+              rateId,
+              rateName: rate.name,
+              materialsCount: rateMaterials.length,
+            })
+
+            return {
+              estimateItem: item,
+              rate: rate,
+              materials: rateMaterials,
+            }
+          } catch (error) {
+            console.error('Error loading rate materials', {
+              rateId: item.selectedRateId,
+              error,
+            })
+            return null
+          }
+        })
+      )
+
+      // Фильтруем null значения
+      const validRatesWithMaterials = ratesWithMaterials.filter(
+        item => item !== null
+      )
+
+      console.log('Transfer data prepared', {
+        totalItems: validRatesWithMaterials.length,
+        timestamp: new Date().toISOString(),
+      })
+
+      // Переходим в калькулятор с данными
+      navigate('/documents/calculator', {
+        state: {
+          importedRates: validRatesWithMaterials,
+          source: 'estimate-import',
+        },
+      })
+
+      message.success(`Перенесено ${validRatesWithMaterials.length} расценок в калькулятор`)
     } catch (error) {
-      console.error('Import error:', error)
-      message.error('Ошибка при импорте')
+      console.error('Transfer to calculator failed', error)
+      message.error('Ошибка при переносе расценок в калькулятор')
     } finally {
-      setLoading(false)
+      setTransferring(false)
     }
   }
 
-  // ============================================================================
-  // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
-  // ============================================================================
-
-  const getMatchStatusTag = (status: MatchedRow['matchStatus']) => {
+  const getStatusTag = (status: ProcessedEstimateRow['status']) => {
     switch (status) {
-      case 'matched':
-        return <Tag color="success">Найдено</Tag>
-      case 'partial':
-        return <Tag color="warning">Частичное</Tag>
-      case 'manual':
-        return <Tag color="blue">Ручной выбор</Tag>
-      case 'unmatched':
-        return <Tag color="error">Не найдено</Tag>
+      case 'exact_match':
+        return <Tag icon={<CheckCircleOutlined />} color="success">Точное совпадение</Tag>
+      case 'good_match':
+        return <Tag icon={<CheckCircleOutlined />} color="processing">Подобрана</Tag>
+      case 'needs_review':
+        return <Tag icon={<WarningOutlined />} color="warning">Требует проверки</Tag>
+      case 'no_match':
+        return <Tag icon={<CloseCircleOutlined />} color="default">Без совпадений</Tag>
+      default:
+        return <Tag icon={<InfoCircleOutlined />} color="default">Ожидает</Tag>
     }
   }
 
-  const getMatchScoreColor = (score: number) => {
-    if (score >= 90) return 'success'
-    if (score >= 70) return 'normal'
-    if (score >= 50) return 'exception'
-    return 'exception'
-  }
-
-  // ============================================================================
-  // КОЛОНКИ ТАБЛИЦ
-  // ============================================================================
-
-  const importedColumns = [
+  const columns = [
     {
       title: '№',
-      key: 'index',
+      dataIndex: 'id',
+      key: 'id',
       width: 60,
-      render: (_: any, __: any, index: number) => index + 1,
+      render: (_: unknown, __: unknown, index: number) => index + 1,
     },
     {
-      title: 'Наименование',
-      dataIndex: 'name',
-      key: 'name',
-      width: 300,
+      title: 'Наименование работ',
+      dataIndex: 'workName',
+      key: 'workName',
+      ellipsis: true,
     },
     {
-      title: 'Категория',
-      dataIndex: 'category',
-      key: 'category',
-      width: 150,
-    },
-    {
-      title: 'Артикул',
-      dataIndex: 'article',
-      key: 'article',
-      width: 120,
-    },
-    {
-      title: 'Бренд',
-      dataIndex: 'brand',
-      key: 'brand',
-      width: 100,
-    },
-    {
-      title: 'Кол-во',
-      dataIndex: 'quantity',
-      key: 'quantity',
-      width: 80,
-      align: 'right' as const,
-    },
-    {
-      title: 'Ед.изм',
+      title: 'Ед.изм.',
       dataIndex: 'unit',
       key: 'unit',
       width: 80,
     },
-  ]
-
-  const matchedColumns = [
     {
-      title: '№',
-      key: 'index',
-      width: 50,
-      fixed: 'left' as const,
-      render: (_: any, __: any, index: number) => index + 1,
+      title: 'Объем',
+      dataIndex: 'volume',
+      key: 'volume',
+      width: 100,
+      render: (volume: number) => volume.toFixed(2),
     },
     {
-      title: 'Наименование',
-      dataIndex: 'name',
-      key: 'name',
-      width: 250,
-      fixed: 'left' as const,
+      title: 'Подкатегория',
+      dataIndex: 'subcategory',
+      key: 'subcategory',
+      width: 150,
+      ellipsis: true,
+      render: (sub: string) => sub || '-',
     },
     {
       title: 'Статус',
-      key: 'matchStatus',
-      width: 120,
-      render: (_: any, record: MatchedRow) =>
-        getMatchStatusTag(record.matchStatus),
+      dataIndex: 'status',
+      key: 'status',
+      width: 180,
+      render: (status: ProcessedEstimateRow['status']) => getStatusTag(status),
     },
     {
-      title: 'Совпадение расценки',
-      key: 'rateMatch',
-      width: 300,
-      render: (_: any, record: MatchedRow) => {
-        if (!record.matchedRate) return '-'
-
-        return (
-          <Space direction="vertical" size="small" style={{ width: '100%' }}>
-            <div>{record.matchedRate.item.name}</div>
-            <Progress
-              percent={Math.round(record.matchedRate.score)}
-              size="small"
-              status={getMatchScoreColor(record.matchedRate.score)}
-            />
-          </Space>
-        )
-      },
-    },
-    {
-      title: 'Совпадение материала',
-      key: 'materialMatch',
-      width: 300,
-      render: (_: any, record: MatchedRow) => {
-        if (!record.matchedMaterial) return '-'
-
-        return (
-          <Space direction="vertical" size="small" style={{ width: '100%' }}>
-            <div>{record.matchedMaterial.item.name}</div>
-            <Progress
-              percent={Math.round(record.matchedMaterial.score)}
-              size="small"
-              status={getMatchScoreColor(record.matchedMaterial.score)}
-            />
-          </Space>
-        )
+      title: 'Расценка',
+      key: 'rate',
+      ellipsis: true,
+      render: (_: unknown, record: ProcessedEstimateRow) => {
+        if (record.selectedRateName) {
+          return (
+            <div>
+              <div>{record.selectedRateName}</div>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {record.selectedRateCode} | Совпадение: {((record.matchScore || 0) * 100).toFixed(1)}%
+              </Text>
+            </div>
+          )
+        }
+        return '-'
       },
     },
     {
       title: 'Действия',
       key: 'actions',
       width: 120,
-      fixed: 'right' as const,
-      render: (_: any, record: MatchedRow) => (
-        <Button
-          icon={<SearchOutlined />}
-          onClick={() => handleManualSearch(record)}
-          size="small"
-        >
-          Поиск
-        </Button>
-      ),
+      render: (_: unknown, record: ProcessedEstimateRow) => {
+        if (record.status === 'needs_review' || record.status === 'no_match') {
+          return (
+            <Button
+              size="small"
+              type="link"
+              onClick={() => handleReviewItem(record)}
+              icon={<SearchOutlined />}
+            >
+              Выбрать
+            </Button>
+          )
+        }
+        if (record.status === 'exact_match' || record.status === 'good_match') {
+          return (
+            <Button
+              size="small"
+              type="link"
+              onClick={() => handleReviewItem(record)}
+              style={{ color: '#52c41a' }}
+            >
+              Изменить
+            </Button>
+          )
+        }
+        return null
+      },
     },
   ]
 
-  // ============================================================================
-  // СТАТИСТИКА
-  // ============================================================================
-
   const stats = {
-    total: matchedData.length,
-    matched: matchedData.filter(r => r.matchStatus === 'matched').length,
-    partial: matchedData.filter(r => r.matchStatus === 'partial').length,
-    manual: matchedData.filter(r => r.matchStatus === 'manual').length,
-    unmatched: matchedData.filter(r => r.matchStatus === 'unmatched').length,
+    total: importData.length,
+    exactMatch: importData.filter(i => i.status === 'exact_match').length,
+    goodMatch: importData.filter(i => i.status === 'good_match').length,
+    needsReview: importData.filter(i => i.status === 'needs_review').length,
+    noMatch: importData.filter(i => i.status === 'no_match').length,
   }
 
-  // ============================================================================
-  // РЕНДЕР
-  // ============================================================================
+  const successRate = stats.total > 0
+    ? ((stats.exactMatch + stats.goodMatch) / stats.total) * 100
+    : 0
 
   return (
-    <div style={{ padding: 24 }}>
-      <Card title="Импорт сметы из Excel" style={{ marginBottom: 24 }}>
-        <Steps current={current} style={{ marginBottom: 32 }}>
-          <Step
-            title="Загрузка файла"
-            icon={current === 0 ? <UploadOutlined /> : undefined}
-          />
-          <Step
-            title="Настройка сопоставления"
-            icon={current === 1 ? <SyncOutlined /> : undefined}
-          />
-          <Step
-            title="Проверка результатов"
-            icon={current === 2 ? <CheckCircleOutlined /> : undefined}
-          />
-          <Step title="Завершение" />
-        </Steps>
+    <div className="modern-page-container">
+      <div className="modern-page-header">
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 24,
+          }}
+        >
+          <div className="modern-page-title">
+            <div className="modern-page-icon">
+              <RocketOutlined />
+            </div>
+            <div>
+              <Title
+                level={2}
+                style={{
+                  margin: 0,
+                  color: '#1a1a1a',
+                  fontSize: 28,
+                  fontWeight: 700,
+                }}
+              >
+                Импорт сметы из Excel
+              </Title>
+              <div style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>
+                Автоматический подбор расценок с учётом подкатегорий
+              </div>
+            </div>
+          </div>
+        </div>
 
-        {/* ШАГ 1: Загрузка файла */}
-        {current === 0 && (
-          <Space direction="vertical" size="large" style={{ width: '100%' }}>
-            <Upload
-              beforeUpload={handleFileUpload}
-              fileList={fileList}
-              onChange={({ fileList }) => setFileList(fileList)}
-              accept=".xlsx,.xls"
-              maxCount={1}
-            >
-              <Button icon={<UploadOutlined />} size="large">
-                Выбрать Excel файл
-              </Button>
-            </Upload>
+        <Alert
+          message="Инструкция по использованию"
+          description={
+            <div>
+              <Paragraph style={{ marginBottom: 8 }}>
+                <strong>Формат Excel файла:</strong>
+              </Paragraph>
+              <ul style={{ marginBottom: 8 }}>
+                <li>Столбец 1: <strong>Наименование работ</strong> (обязательно)</li>
+                <li>Столбец 2: <strong>Ед.изм.</strong> (обязательно)</li>
+                <li>Столбец 3: <strong>Объем</strong> (обязательно)</li>
+                <li>Столбец 4: <strong>Подкатегория</strong> (рекомендуется для лучшего подбора)</li>
+                <li>Столбец 5: <strong>Категория</strong> (опционально)</li>
+                <li>Столбец 6: <strong>Описание</strong> (опционально)</li>
+              </ul>
+              <Paragraph style={{ marginBottom: 0 }}>
+                <strong>Совет:</strong> Заполнение подкатегории значительно улучшает качество автоматического подбора расценок!
+              </Paragraph>
+            </div>
+          }
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
 
-            {importedData.length > 0 && (
-              <>
-                <Descriptions bordered size="small" column={2}>
-                  <Descriptions.Item label="Строк загружено">
-                    {importedData.length}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Статус">
-                    <Tag color="success">Готово к сопоставлению</Tag>
-                  </Descriptions.Item>
-                </Descriptions>
-
-                <Table
-                  dataSource={importedData}
-                  columns={importedColumns}
-                  rowKey="id"
-                  pagination={{ pageSize: 10 }}
-                  scroll={{ x: 'max-content', y: 400 }}
-                  size="small"
-                />
-
-                <Button type="primary" onClick={() => setCurrent(1)}>
-                  Далее
+        <Card style={{ marginBottom: 16 }}>
+          <Space direction="vertical" style={{ width: '100%' }} size="large">
+            <Space size="middle" wrap>
+              <Upload
+                accept=".xlsx,.xls"
+                beforeUpload={handleFileUpload}
+                showUploadList={false}
+                maxCount={1}
+              >
+                <Button
+                  icon={<UploadOutlined />}
+                  size="large"
+                  style={{
+                    borderRadius: 10,
+                    height: 44,
+                  }}
+                >
+                  Загрузить Excel файл
                 </Button>
-              </>
+              </Upload>
+
+              <Button
+                type="primary"
+                icon={<FileExcelOutlined />}
+                size="large"
+                onClick={handleAutoMatch}
+                disabled={importData.length === 0 || processing || ratesLoading}
+                loading={processing}
+                style={{
+                  borderRadius: 10,
+                  height: 44,
+                }}
+              >
+                Автоматический подбор расценок
+              </Button>
+
+              <div>
+                <Text strong style={{ marginRight: 8 }}>Порог автоподбора:</Text>
+                <Radio.Group
+                  value={autoMatchThreshold}
+                  onChange={e => setAutoMatchThreshold(e.target.value)}
+                  disabled={processing}
+                >
+                  <Radio.Button value={0.95}>Строгий (95%)</Radio.Button>
+                  <Radio.Button value={0.9}>Норма (90%)</Radio.Button>
+                  <Radio.Button value={0.8}>Мягкий (80%)</Radio.Button>
+                </Radio.Group>
+              </div>
+            </Space>
+
+            {processing && (
+              <div>
+                <Text>Обработка позиций...</Text>
+                <Progress
+                  percent={Math.round((processedCount / importData.length) * 100)}
+                  status="active"
+                />
+              </div>
             )}
           </Space>
+        </Card>
+
+        {importData.length > 0 && (
+          <Card style={{ marginBottom: 16 }}>
+            <Row gutter={16}>
+              <Col span={6}>
+                <Statistic
+                  title="Всего позиций"
+                  value={stats.total}
+                  prefix={<InfoCircleOutlined />}
+                />
+              </Col>
+              <Col span={6}>
+                <Statistic
+                  title="Точных совпадений"
+                  value={stats.exactMatch}
+                  valueStyle={{ color: '#52c41a' }}
+                  prefix={<CheckCircleOutlined />}
+                />
+              </Col>
+              <Col span={6}>
+                <Statistic
+                  title="Хороших совпадений"
+                  value={stats.goodMatch}
+                  valueStyle={{ color: '#1890ff' }}
+                  prefix={<CheckCircleOutlined />}
+                />
+              </Col>
+              <Col span={6}>
+                <Statistic
+                  title="Успешность"
+                  value={successRate.toFixed(0)}
+                  suffix="%"
+                  valueStyle={{ color: successRate >= 80 ? '#52c41a' : '#faad14' }}
+                />
+              </Col>
+            </Row>
+            <Divider />
+            <Row gutter={16}>
+              <Col span={12}>
+                <Statistic
+                  title="Требует проверки"
+                  value={stats.needsReview}
+                  valueStyle={{ color: '#faad14' }}
+                  prefix={<WarningOutlined />}
+                />
+              </Col>
+              <Col span={12}>
+                <Statistic
+                  title="Без совпадений"
+                  value={stats.noMatch}
+                  valueStyle={{ color: '#999' }}
+                  prefix={<CloseCircleOutlined />}
+                />
+              </Col>
+            </Row>
+          </Card>
         )}
 
-        {/* ШАГ 2: Настройка сопоставления */}
-        {current === 1 && (
-          <Space direction="vertical" size="large" style={{ width: '100%' }}>
-            <Card title="Настройки сопоставления" size="small">
-              <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 8 }}>
-                    Режим сопоставления:
-                  </label>
-                  <Radio.Group
-                    value={matchingMode}
-                    onChange={e => setMatchingMode(e.target.value)}
-                  >
-                    <Space direction="vertical">
-                      <Radio value="legacy">
-                        <Space>
-                          Legacy (Совместимость)
-                          <Tooltip title="Название: 40%, Описание: 20%, Категория: 15%, Артикул: 15%, Спецификация: 10%">
-                            <QuestionCircleOutlined />
-                          </Tooltip>
-                        </Space>
-                      </Radio>
-                      <Radio value="optimized">
-                        <Space>
-                          Optimized (Рекомендуется)
-                          <Tooltip title="Название: 50%, Артикул: 30%, Бренд: 20%">
-                            <QuestionCircleOutlined />
-                          </Tooltip>
-                        </Space>
-                      </Radio>
-                      <Radio value="equipment_code_priority">
-                        <Space>
-                          Equipment Code Priority
-                          <Tooltip title="Код оборудования: 60%, Название: 20%, Производитель: 20%">
-                            <QuestionCircleOutlined />
-                          </Tooltip>
-                        </Space>
-                      </Radio>
-                    </Space>
-                  </Radio.Group>
-                </div>
+        {importData.length > 0 && (stats.exactMatch + stats.goodMatch) > 0 && (
+          <Card style={{ marginBottom: 16 }}>
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <div>
+                <Title level={5} style={{ marginBottom: 8 }}>
+                  Перенос в калькулятор смет
+                </Title>
+                <Text type="secondary">
+                  Перенести {stats.exactMatch + stats.goodMatch} успешно подобранных расценок
+                  в калькулятор смет вместе с их материалами из сборника расценок
+                </Text>
+              </div>
+              <Button
+                type="primary"
+                size="large"
+                icon={<SendOutlined />}
+                onClick={handleTransferToCalculator}
+                loading={transferring}
+                disabled={transferring}
+                style={{
+                  borderRadius: 10,
+                  height: 48,
+                  fontSize: 16,
+                  fontWeight: 600,
+                }}
+              >
+                Перенести в калькулятор ({stats.exactMatch + stats.goodMatch})
+              </Button>
+            </Space>
+          </Card>
+        )}
+      </div>
 
-                <div>
-                  <label style={{ display: 'block', marginBottom: 8 }}>
-                    Минимальный порог совпадения (%):
-                  </label>
-                  <Select
-                    value={minScore}
-                    onChange={setMinScore}
-                    style={{ width: 200 }}
-                  >
-                    <Select.Option value={50}>50%</Select.Option>
-                    <Select.Option value={60}>60%</Select.Option>
-                    <Select.Option value={70}>70% (по умолчанию)</Select.Option>
-                    <Select.Option value={80}>80%</Select.Option>
-                    <Select.Option value={90}>90%</Select.Option>
-                  </Select>
-                </div>
+      <div className="modern-page-content">
+        {importData.length > 0 && (
+          <Table
+            className="modern-table"
+            columns={columns}
+            dataSource={importData}
+            rowKey="id"
+            pagination={{
+              showSizeChanger: true,
+              showQuickJumper: true,
+              showTotal: (total, range) =>
+                `${range[0]}-${range[1]} из ${total} записей`,
+              pageSizeOptions: ['10', '20', '50', '100'],
+              defaultPageSize: 20,
+            }}
+            scroll={{ x: 'max-content' }}
+          />
+        )}
 
+        {importData.length === 0 && (
+          <Card>
+            <div style={{ textAlign: 'center', padding: '40px 0' }}>
+              <FileExcelOutlined style={{ fontSize: 64, color: '#d9d9d9' }} />
+              <Title level={4} style={{ marginTop: 16, color: '#999' }}>
+                Загрузите Excel файл для начала работы
+              </Title>
+            </div>
+          </Card>
+        )}
+      </div>
+
+      {/* Модальное окно выбора расценки */}
+      <Modal
+        title={`Выбор расценки для: ${currentReviewItem?.workName || ''}`}
+        open={isReviewModalOpen}
+        onCancel={() => {
+          setIsReviewModalOpen(false)
+          setSearchTerm('')
+          setSelectedSubcategory('')
+        }}
+        footer={[
+          <Button key="skip" onClick={handleSkipItem}>
+            Пропустить
+          </Button>,
+          <Button
+            key="cancel"
+            onClick={() => {
+              setIsReviewModalOpen(false)
+              setSearchTerm('')
+              setSelectedSubcategory('')
+            }}
+          >
+            Отмена
+          </Button>,
+        ]}
+        width={1000}
+      >
+        {currentReviewItem && (
+          <div>
+            <Card size="small" style={{ marginBottom: 16, background: '#f5f5f5' }}>
+              <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                <Text strong>Информация о позиции:</Text>
                 <div>
-                  <label style={{ display: 'block', marginBottom: 8 }}>
-                    Фильтр по категории (опционально):
-                  </label>
-                  <Input
-                    placeholder="Введите категорию"
-                    value={categoryFilter}
-                    onChange={e => setCategoryFilter(e.target.value)}
-                    allowClear
-                    style={{ width: 300 }}
-                  />
+                  <Text type="secondary">Единица измерения:</Text> {currentReviewItem.unit}
+                </div>
+                <div>
+                  <Text type="secondary">Объем:</Text> {currentReviewItem.volume}
+                </div>
+                {currentReviewItem.subcategory && (
+                  <div>
+                    <Text type="secondary">Подкатегория:</Text> {currentReviewItem.subcategory}
+                  </div>
+                )}
+              </Space>
+            </Card>
+
+            {/* Фильтры для поиска расценок */}
+            <Card size="small" style={{ marginBottom: 16 }}>
+              <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                <div>
+                  <Text strong style={{ marginBottom: 8, display: 'block' }}>
+                    Фильтры поиска:
+                  </Text>
+                  <Space direction="vertical" style={{ width: '100%' }} size="small">
+                    <Input
+                      placeholder="Поиск по наименованию, коду или описанию..."
+                      prefix={<SearchOutlined />}
+                      value={searchTerm}
+                      onChange={e => setSearchTerm(e.target.value)}
+                      allowClear
+                    />
+                    <Select
+                      placeholder="Выберите подкатегорию"
+                      value={selectedSubcategory || undefined}
+                      onChange={value => setSelectedSubcategory(value || '')}
+                      allowClear
+                      showSearch
+                      style={{ width: '100%' }}
+                      filterOption={(input, option) => {
+                        const text = option?.children?.toString() || ''
+                        return text.toLowerCase().includes(input.toLowerCase())
+                      }}
+                    >
+                      {uniqueSubcategories.map(subcategory => (
+                        <Select.Option key={subcategory} value={subcategory}>
+                          {subcategory}
+                        </Select.Option>
+                      ))}
+                    </Select>
+                  </Space>
                 </div>
               </Space>
             </Card>
 
-            <Space>
-              <Button onClick={() => setCurrent(0)}>Назад</Button>
-              <Button
-                type="primary"
-                onClick={handleStartMatching}
-                loading={loading}
-              >
-                Запустить сопоставление
-              </Button>
-            </Space>
-          </Space>
-        )}
+            {(() => {
+              const filteredRates = getFilteredRatesForManualSelection()
+              const hasMatches = currentReviewItem.matches && currentReviewItem.matches.length > 0
 
-        {/* ШАГ 3: Проверка результатов */}
-        {current === 2 && (
-          <Space direction="vertical" size="large" style={{ width: '100%' }}>
-            <Card title="Статистика сопоставления" size="small">
-              <Descriptions bordered size="small" column={5}>
-                <Descriptions.Item label="Всего">
-                  {stats.total}
-                </Descriptions.Item>
-                <Descriptions.Item label="Найдено">
-                  <Tag color="success">{stats.matched}</Tag>
-                </Descriptions.Item>
-                <Descriptions.Item label="Частичное">
-                  <Tag color="warning">{stats.partial}</Tag>
-                </Descriptions.Item>
-                <Descriptions.Item label="Ручной выбор">
-                  <Tag color="blue">{stats.manual}</Tag>
-                </Descriptions.Item>
-                <Descriptions.Item label="Не найдено">
-                  <Tag color="error">{stats.unmatched}</Tag>
-                </Descriptions.Item>
-              </Descriptions>
-            </Card>
-
-            <Table
-              dataSource={matchedData}
-              columns={matchedColumns}
-              rowKey="id"
-              pagination={{ pageSize: 10 }}
-              scroll={{ x: 1400, y: 500 }}
-              size="small"
-            />
-
-            <Space>
-              <Button onClick={() => setCurrent(1)}>Назад</Button>
-              <Button
-                type="primary"
-                onClick={handleImport}
-                loading={loading}
-                disabled={stats.total === 0}
-              >
-                Импортировать в систему
-              </Button>
-            </Space>
-          </Space>
-        )}
-
-        {/* ШАГ 4: Завершение */}
-        {current === 3 && (
-          <Space
-            direction="vertical"
-            size="large"
-            style={{ width: '100%', textAlign: 'center' }}
-          >
-            <CheckCircleOutlined
-              style={{ fontSize: 72, color: '#52c41a' }}
-            />
-            <h2>Импорт завершен успешно!</h2>
-            <p>Все данные были импортированы в систему.</p>
-            <Button
-              type="primary"
-              onClick={() => {
-                setCurrent(0)
-                setImportedData([])
-                setMatchedData([])
-                setFileList([])
-              }}
-            >
-              Начать новый импорт
-            </Button>
-          </Space>
-        )}
-      </Card>
-
-      {/* МОДАЛЬНОЕ ОКНО РУЧНОГО ПОИСКА */}
-      <Modal
-        title={`Ручной поиск расценки: ${currentSearchRow?.name}`}
-        open={manualSearchVisible}
-        onCancel={() => setManualSearchVisible(false)}
-        width={900}
-        footer={null}
-      >
-        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-          <Input.Search
-            placeholder="Введите запрос для поиска"
-            value={manualSearchQuery}
-            onChange={e => setManualSearchQuery(e.target.value)}
-            onSearch={performManualSearch}
-            enterButton="Искать"
-            size="large"
-          />
-
-          <Table
-            dataSource={manualSearchResults}
-            rowKey={record => record.item.id}
-            size="small"
-            pagination={false}
-            scroll={{ y: 400 }}
-            columns={[
-              {
-                title: 'Наименование',
-                key: 'name',
-                render: (_, record) => record.item.name,
-              },
-              {
-                title: 'Совпадение',
-                key: 'score',
-                width: 150,
-                render: (_, record) => (
-                  <Progress
-                    percent={Math.round(record.score)}
-                    size="small"
-                    status={getMatchScoreColor(record.score)}
+              if (filteredRates.length === 0) {
+                return (
+                  <Alert
+                    message="Расценок не найдено"
+                    description="Попробуйте изменить фильтры поиска"
+                    type="warning"
+                    showIcon
                   />
-                ),
-              },
-              {
-                title: 'Действие',
-                key: 'action',
-                width: 100,
-                render: (_, record) => (
-                  <Button
-                    type="link"
-                    onClick={() => handleSelectManualMatch(record)}
-                  >
-                    Выбрать
-                  </Button>
-                ),
-              },
-            ]}
-          />
-        </Space>
+                )
+              }
+
+              return (
+                <div>
+                  <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text strong>
+                      {hasMatches ? 'Похожие расценки' : 'Все доступные расценки'} ({filteredRates.length})
+                    </Text>
+                    {searchTerm || selectedSubcategory ? (
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        Применены фильтры
+                      </Text>
+                    ) : null}
+                  </div>
+                  <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+                    {filteredRates.slice(0, 50).map(rate => {
+                      const match = currentReviewItem.matches?.find(m => m.rateId === rate.id)
+
+                      return (
+                        <Card
+                          key={rate.id}
+                          size="small"
+                          style={{ marginBottom: 12, cursor: 'pointer' }}
+                          hoverable
+                          onClick={() => handleSelectRate(rate.id)}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ marginBottom: 4 }}>
+                                <Text strong>{rate.name}</Text>
+                              </div>
+                              <Space size="small" wrap>
+                                <Tag>{rate.code}</Tag>
+                                <Tag>{rate.unit_name}</Tag>
+                                <Tag color="blue">{rate.base_price} ₽</Tag>
+                                {match && (
+                                  <Tag
+                                    color={
+                                      getMatchQuality(match) === 'exact'
+                                        ? 'green'
+                                        : getMatchQuality(match) === 'good'
+                                        ? 'blue'
+                                        : 'orange'
+                                    }
+                                  >
+                                    Совпадение: {(match.score * 100).toFixed(1)}%
+                                  </Tag>
+                                )}
+                              </Space>
+                              {rate.subcategory && (
+                                <div style={{ marginTop: 4 }}>
+                                  <Text type="secondary" style={{ fontSize: 12 }}>
+                                    📂 {rate.subcategory}
+                                  </Text>
+                                </div>
+                              )}
+                              {match && (
+                                <div style={{ marginTop: 4 }}>
+                                  <Text type="secondary" style={{ fontSize: 12 }}>
+                                    {formatMatchInfo(match)}
+                                  </Text>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </Card>
+                      )
+                    })}
+                    {filteredRates.length > 50 && (
+                      <Alert
+                        message={`Показано 50 из ${filteredRates.length} расценок`}
+                        description="Используйте фильтры для сужения поиска"
+                        type="info"
+                        showIcon
+                        style={{ marginTop: 12 }}
+                      />
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        )}
       </Modal>
     </div>
   )
 }
+
+export default EstimateImport
