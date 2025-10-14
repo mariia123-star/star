@@ -243,7 +243,7 @@ const EstimateCalculatorDemo = () => {
             materialType: 'основ', // Основной материал - будет показан в "Мат в КП"
             rowType: 'мат',
             workName: material.name,
-            unit: unit?.name || 'шт',
+            unit: unit?.short_name || 'шт',
             volume: estimateItem.volume,
             materialCoef: rateMaterial.consumption, // Используем consumption вместо quantity
             workVolume: estimateItem.volume * rateMaterial.consumption,
@@ -260,7 +260,7 @@ const EstimateCalculatorDemo = () => {
             materialName: material.name,
             consumption: rateMaterial.consumption,
             price: materialPrice,
-            unit: unit?.name || 'шт',
+            unit: unit?.short_name || 'шт',
           })
         })
       } else {
