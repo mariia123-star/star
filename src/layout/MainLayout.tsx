@@ -16,6 +16,7 @@ import {
   MenuUnfoldOutlined,
   AuditOutlined,
   CalculatorOutlined,
+  RocketOutlined,
 } from '@ant-design/icons'
 
 const { Header, Sider, Content } = Layout
@@ -54,6 +55,12 @@ const menuItems = [
         key: '/documents/calculator',
         icon: <CalculatorOutlined />,
         label: 'Калькулятор смет',
+        className: 'sub-menu-item',
+      },
+      {
+        key: '/documents/estimate-import',
+        icon: <RocketOutlined />,
+        label: 'Импорт сметы из Excel',
         className: 'sub-menu-item',
       },
     ],

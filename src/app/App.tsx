@@ -9,6 +9,7 @@ import TenderTest from '@/pages/documents/TenderTest'
 import TenderEstimates from '@/pages/documents/TenderEstimates'
 import TenderTestWithAutocomplete from '@/pages/documents/TenderTestWithAutocomplete'
 import EstimateCalculatorDemo from '@/pages/documents/EstimateCalculatorDemo'
+import EstimateImport from '@/pages/documents/EstimateImport'
 import Users from '@/pages/developer/Users'
 import Rates from '@/pages/developer/Rates'
 import Materials from '@/pages/developer/Materials'
@@ -59,6 +60,10 @@ function AppMain() {
                 <Route
                   path="/documents/calculator"
                   element={<EstimateCalculatorDemo />}
+                />
+                <Route
+                  path="/documents/estimate-import"
+                  element={<EstimateImport />}
                 />
                 <Route path="/developer/users" element={<Users />} />
                 <Route path="/developer/rates" element={<Rates />} />

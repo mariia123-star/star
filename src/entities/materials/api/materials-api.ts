@@ -531,4 +531,93 @@ export const materialsApi = {
 
     return data
   },
+
+  /**
+   * Обновить цену материала с сохранением истории
+   * @param materialId - ID материала
+   * @param newPrice - Новая цена
+   * @param source - Источник изменения
+   * @param notes - Дополнительные заметки
+   */
+  async updatePriceWithHistory(
+    materialId: string,
+    newPrice: number,
+    source: 'manual' | 'estimate_calculator' | 'import' = 'manual',
+    notes?: string
+  ): Promise<Material> {
+    if (!supabase) {
+      console.log('API Request:', {
+        table: 'materials',
+        action: 'update_price_with_history',
+        materialId,
+        newPrice,
+        source,
+        mode: 'mock',
+        timestamp: new Date().toISOString(),
+        success: true,
+      })
+
+      const materialIndex = mockMaterials.findIndex(m => m.id === materialId)
+      if (materialIndex === -1) {
+        throw new Error(`Материал с id ${materialId} не найден`)
+      }
+
+      const updatedMaterial = {
+        ...mockMaterials[materialIndex],
+        last_purchase_price: newPrice,
+        updated_at: new Date().toISOString(),
+      }
+      mockMaterials[materialIndex] = updatedMaterial
+
+      return updatedMaterial
+    }
+
+    console.log('API Request: Updating material price with history', {
+      action: 'update_price_with_history',
+      materialId,
+      newPrice,
+      source,
+      timestamp: new Date().toISOString(),
+    })
+
+    // Обновляем цену материала
+    const { data: updatedMaterial, error: updateError } = await supabase
+      .from('materials')
+      .update({
+        last_purchase_price: newPrice,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', materialId)
+      .select()
+      .single()
+
+    if (updateError) {
+      console.error('Update material price failed:', updateError)
+      throw updateError
+    }
+
+    // Добавляем запись в историю цен
+    const { error: historyError } = await supabase
+      .from('material_price_history')
+      .insert({
+        material_id: materialId,
+        price: newPrice,
+        source,
+        notes,
+      })
+
+    if (historyError) {
+      console.error('Create price history failed:', historyError)
+      // Не бросаем ошибку, т.к. основная задача выполнена
+      console.warn('Price updated but history record failed')
+    }
+
+    console.log('API Response: Price updated successfully', {
+      action: 'update_price_with_history_response',
+      success: true,
+      timestamp: new Date().toISOString(),
+    })
+
+    return updatedMaterial
+  },
 }

@@ -10,16 +10,19 @@ export interface RateMaterial {
   created_at: string
   updated_at: string
   // Расширенные поля из джоинов
-  material?: {
+  materials?: {
     id: string
     code: string
     name: string
     description?: string
     unit_id: string
-    unit_name: string
-    unit_short_name: string
     last_purchase_price?: number
     is_active: boolean
+    units?: {
+      id: string
+      name: string
+      short_name: string
+    }
   }
 }
 
@@ -51,25 +54,86 @@ class RateMaterialsApi {
       timestamp: new Date().toISOString(),
     })
 
-    const { data, error } = await supabase
+    // Шаг 1: Получаем связи rate_materials_mapping
+    const { data: mappings, error: mappingsError } = await supabase
       .from('rate_materials_mapping')
       .select('*')
       .eq('rate_id', rateId)
       .order('created_at', { ascending: true })
 
-    console.log('API Response: Materials for rate', {
+    if (mappingsError) {
+      console.error('Get rate materials mapping error:', mappingsError)
+      throw mappingsError
+    }
+
+    if (!mappings || mappings.length === 0) {
+      console.log('No materials found for rate', { rateId })
+      return []
+    }
+
+    // Шаг 2: Получаем материалы по их ID
+    const materialIds = mappings.map(m => m.material_id)
+    const { data: materials, error: materialsError } = await supabase
+      .from('materials')
+      .select('*')
+      .in('id', materialIds)
+
+    if (materialsError) {
+      console.error('Get materials error:', materialsError)
+      throw materialsError
+    }
+
+    // Шаг 3: Получаем единицы измерения для материалов
+    const unitIds = materials?.map(m => m.unit_id).filter(Boolean) || []
+    const { data: units, error: unitsError } = await supabase
+      .from('units')
+      .select('*')
+      .in('id', unitIds)
+
+    if (unitsError) {
+      console.error('Get units error:', unitsError)
+      throw unitsError
+    }
+
+    // Шаг 4: Собираем данные вместе
+    const result: RateMaterial[] = mappings.map(mapping => {
+      const material = materials?.find(m => m.id === mapping.material_id)
+      const unit = units?.find(u => u.id === material?.unit_id)
+
+      return {
+        id: mapping.id,
+        rate_id: mapping.rate_id,
+        material_id: mapping.material_id,
+        consumption: mapping.consumption,
+        unit_price: mapping.unit_price,
+        notes: mapping.notes,
+        created_at: mapping.created_at,
+        updated_at: mapping.updated_at,
+        materials: material ? {
+          id: material.id,
+          code: material.code,
+          name: material.name,
+          description: material.description,
+          unit_id: material.unit_id,
+          last_purchase_price: material.last_purchase_price,
+          is_active: material.is_active,
+          units: unit ? {
+            id: unit.id,
+            name: unit.name,
+            short_name: unit.short_name,
+          } : undefined,
+        } : undefined,
+      }
+    })
+
+    console.log('API Response: Materials for rate (manual JOIN)', {
       action: 'get_materials_by_rate_response',
-      success: !error,
-      dataCount: data?.length || 0,
+      success: true,
+      dataCount: result.length,
       timestamp: new Date().toISOString(),
     })
 
-    if (error) {
-      console.error('Get materials by rate error:', error)
-      throw error
-    }
-
-    return data || []
+    return result
   }
 
   // Добавить материал к расценке

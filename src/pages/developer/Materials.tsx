@@ -30,6 +30,8 @@ import {
   RightOutlined,
   GoogleOutlined,
   LinkOutlined,
+  ExportOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -40,8 +42,11 @@ import {
   MATERIAL_CATEGORY_OPTIONS,
 } from '@/entities/materials'
 import { unitsApi } from '@/entities/units'
+import { ratesApi } from '@/entities/rates'
+import { rateMaterialsApi } from '@/entities/rates/api/rate-materials-api'
 import * as XLSX from 'xlsx'
 import { generateMaterialCode } from '@/shared/utils/codeGenerator'
+import { MaterialPriceAnalytics } from '@/widgets/materials'
 
 const { Title } = Typography
 const { Search } = Input
@@ -51,6 +56,7 @@ interface MaterialFormData {
   name: string
   description?: string
   category: string
+  rate_category?: string // Категория расценки для автоматической связи
   unit_id: string
   last_purchase_price?: number
   supplier?: string
@@ -77,6 +83,7 @@ function Materials() {
     useState(false)
   const [googleSheetsUrl, setGoogleSheetsUrl] = useState('')
   const [isAnalyzingSheet, setIsAnalyzingSheet] = useState(false)
+  const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false)
 
   const queryClient = useQueryClient()
 
@@ -92,6 +99,11 @@ function Materials() {
   const { data: units = [], error: unitsError } = useQuery({
     queryKey: ['units'],
     queryFn: unitsApi.getAll,
+  })
+
+  const { data: rates = [] } = useQuery({
+    queryKey: ['rates'],
+    queryFn: ratesApi.getAll,
   })
 
   console.log('Materials page rendered', {
@@ -114,10 +126,16 @@ function Materials() {
 
   const createMutation = useMutation({
     mutationFn: materialsApi.create,
-    onSuccess: data => {
+    onSuccess: async (data, variables) => {
       console.log('Material created successfully:', data)
       queryClient.invalidateQueries({ queryKey: ['materials'] })
       message.success('Материал успешно создан')
+
+      // Автоматически связываем материал с расценками, если указана категория расценки
+      if (variables.rate_category?.trim()) {
+        await handleRateCategoryLink(variables, data.id)
+      }
+
       handleCloseModal()
     },
     onError: error => {
@@ -133,10 +151,29 @@ function Materials() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: MaterialUpdate }) =>
       materialsApi.update(id, data),
-    onSuccess: data => {
+    onSuccess: async (data, variables) => {
       console.log('Material updated successfully:', data)
       queryClient.invalidateQueries({ queryKey: ['materials'] })
       message.success('Материал успешно обновлен')
+
+      // Автоматически связываем материал с расценками, если указана категория расценки
+      if (variables.data.rate_category?.trim()) {
+        // Преобразуем MaterialUpdate в MaterialFormData для совместимости
+        const materialFormData: MaterialFormData = {
+          code: variables.data.code || data.code,
+          name: variables.data.name || data.name,
+          description: variables.data.description,
+          category: variables.data.category || data.category,
+          rate_category: variables.data.rate_category,
+          unit_id: variables.data.unit_id || data.unit_id,
+          last_purchase_price: variables.data.last_purchase_price,
+          supplier: variables.data.supplier,
+          supplier_article: variables.data.supplier_article,
+          is_active: variables.data.is_active ?? data.is_active,
+        }
+        await handleRateCategoryLink(materialFormData, variables.id)
+      }
+
       handleCloseModal()
     },
     onError: error => {
@@ -183,6 +220,98 @@ function Materials() {
       message.error(`Ошибка при импорте: ${error.message}`)
     },
   })
+
+  // Функция автоматической связи материала с расценками по категории
+  const handleRateCategoryLink = async (
+    materialData: MaterialFormData,
+    materialId: string
+  ) => {
+    // Проверяем, что rate_category заполнена
+    if (!materialData.rate_category?.trim()) {
+      console.log('Rate category not specified, skipping auto-link', {
+        materialId,
+        timestamp: new Date().toISOString(),
+      })
+      return
+    }
+
+    try {
+      console.log('Starting rate category auto-link', {
+        action: 'rate_category_auto_link_start',
+        materialId,
+        materialName: materialData.name,
+        rateCategory: materialData.rate_category,
+        timestamp: new Date().toISOString(),
+      })
+
+      // Находим все расценки, у которых subcategory совпадает с rate_category материала
+      const matchingRates = rates.filter(
+        rate =>
+          rate.subcategory &&
+          rate.subcategory.toLowerCase() ===
+            materialData.rate_category!.toLowerCase()
+      )
+
+      console.log('Found matching rates:', {
+        rateCategory: materialData.rate_category,
+        matchingRatesCount: matchingRates.length,
+        matchingRatesIds: matchingRates.map(r => ({
+          id: r.id,
+          code: r.code,
+          name: r.name,
+          subcategory: r.subcategory,
+        })),
+      })
+
+      if (matchingRates.length === 0) {
+        console.log('No matching rates found for category', {
+          rateCategory: materialData.rate_category,
+          timestamp: new Date().toISOString(),
+        })
+        message.info(
+          `Расценки с подкатегорией "${materialData.rate_category}" не найдены. Материал создан без автосвязи.`
+        )
+        return
+      }
+
+      // Создаём связи для каждой найденной расценки
+      const linkPromises = matchingRates.map(rate =>
+        rateMaterialsApi.create({
+          rate_id: rate.id,
+          material_id: materialId,
+          consumption: 1, // Значение по умолчанию
+          unit_price: materialData.last_purchase_price || 0,
+          notes: `Автоматически связано по категории "${materialData.rate_category}"`,
+        })
+      )
+
+      await Promise.all(linkPromises)
+
+      console.log('Rate category auto-link completed', {
+        action: 'rate_category_auto_link_success',
+        materialId,
+        linkedRatesCount: matchingRates.length,
+        timestamp: new Date().toISOString(),
+      })
+
+      message.success(
+        `Материал "${materialData.name}" успешно связан с ${matchingRates.length} расценками`
+      )
+
+      // Обновляем кеш расценок, чтобы отобразить новые связи
+      queryClient.invalidateQueries({ queryKey: ['rates'] })
+    } catch (error) {
+      console.error('Rate category auto-link error:', {
+        error,
+        materialId,
+        rateCategory: materialData.rate_category,
+        timestamp: new Date().toISOString(),
+      })
+      message.warning(
+        `Материал создан, но не удалось автоматически связать с расценками: ${error}`
+      )
+    }
+  }
 
   const toggleCategoryExpansion = (categoryValue: string) => {
     console.log('Toggle category expansion', {
@@ -342,6 +471,34 @@ function Materials() {
     setIsImportModalOpen(true)
   }
 
+  // Функция сопоставления русского названия категории с кодом
+  const getCategoryCodeByLabel = (label: string): string => {
+    if (!label) return 'other'
+
+    const normalizedLabel = label.toLowerCase().trim()
+
+    // Поиск по точному совпадению label
+    const exactMatch = MATERIAL_CATEGORY_OPTIONS.find(
+      opt => opt.label.toLowerCase() === normalizedLabel
+    )
+    if (exactMatch) return exactMatch.value
+
+    // Поиск по частичному совпадению (например, "бетон" найдет "Бетон и ЖБИ")
+    const partialMatch = MATERIAL_CATEGORY_OPTIONS.find(opt =>
+      opt.label.toLowerCase().includes(normalizedLabel)
+    )
+    if (partialMatch) return partialMatch.value
+
+    // Поиск по коду (если уже передан код)
+    const codeMatch = MATERIAL_CATEGORY_OPTIONS.find(
+      opt => opt.value === normalizedLabel
+    )
+    if (codeMatch) return codeMatch.value
+
+    console.warn(`Категория "${label}" не найдена, использована "other"`)
+    return 'other'
+  }
+
   // eslint-disable-next-line no-undef
   const handleFileUpload = (file: File): boolean => {
     console.log('File upload started', {
@@ -414,14 +571,31 @@ function Materials() {
 
         for (let i = 1; i < jsonData.length; i++) {
           const row = jsonData[i] as (string | number)[]
-          if (row.length === 0) continue
+
+          // Пропускаем полностью пустые строки
+          if (!row || row.length === 0 || row.every(cell => !cell)) {
+            console.log(`Строка ${i + 1}: пустая строка, пропускается`)
+            continue
+          }
 
           try {
+            // Детальное логирование каждой строки для отладки
+            console.log(`Парсинг строки ${i + 1}:`, {
+              row,
+              code: row[0],
+              name: row[1],
+              unit: row[4],
+            })
+
+            // Преобразуем категорию из русского названия в код
+            const categoryInput = String(row[3] || 'other').trim()
+            const categoryCode = getCategoryCodeByLabel(categoryInput)
+
             const rowData: MaterialImportRow = {
               code: String(row[0] || '').trim(),
               name: String(row[1] || '').trim(),
               description: row[2] ? String(row[2]).trim() : undefined,
-              category: String(row[3] || 'other').trim(),
+              category: categoryCode, // Используем преобразованный код
               unit_name: String(row[4] || '').trim(),
               last_purchase_price:
                 typeof row[5] === 'number'
@@ -433,53 +607,87 @@ function Materials() {
               supplier_article: row[7] ? String(row[7]).trim() : undefined,
             }
 
-            // Валидация обязательных полей
+            console.log(`Строка ${i + 1}: категория преобразована`, {
+              input: categoryInput,
+              output: categoryCode,
+            })
+
+            // Валидация обязательных полей с детальным логированием
             if (!rowData.code) {
-              errors.push(`Строка ${i + 1}: отсутствует код материала`)
+              const errorMsg = `Строка ${i + 1}: отсутствует код материала (значение: '${row[0]}')`
+              errors.push(errorMsg)
+              console.warn(errorMsg)
               continue
             }
             if (!rowData.name) {
-              errors.push(`Строка ${i + 1}: отсутствует наименование материала`)
+              const errorMsg = `Строка ${i + 1}: отсутствует наименование материала (значение: '${row[1]}')`
+              errors.push(errorMsg)
+              console.warn(errorMsg)
               continue
             }
             if (!rowData.unit_name) {
-              errors.push(`Строка ${i + 1}: отсутствует единица измерения`)
+              const errorMsg = `Строка ${i + 1}: отсутствует единица измерения (значение: '${row[4]}')`
+              errors.push(errorMsg)
+              console.warn(errorMsg)
               continue
             }
 
-            // Валидация категории
-            const validCategories = MATERIAL_CATEGORY_OPTIONS.map(
-              opt => opt.value
-            )
-            if (!validCategories.includes(rowData.category as string)) {
-              console.warn(
-                `Строка ${i + 1}: неизвестная категория '${rowData.category}', использована 'other'`
-              )
-              rowData.category = 'other'
-            }
-
             parsedData.push(rowData)
+            console.log(`Строка ${i + 1}: успешно обработана`, rowData)
           } catch (error) {
-            errors.push(`Строка ${i + 1}: ошибка парсинга - ${error}`)
-            console.error(`Row ${i + 1} parsing error:`, error)
+            const errorMsg = `Строка ${i + 1}: ошибка парсинга - ${error}`
+            errors.push(errorMsg)
+            console.error(errorMsg, { row, error })
           }
         }
 
         // Показываем ошибки если есть
         if (errors.length > 0) {
           console.error('Excel parsing errors:', errors)
-          message.warning(
-            `Обнаружены ошибки в ${errors.length} строках. Проверьте консоль для подробностей.`
-          )
+
+          // Выводим первые 10 ошибок для отладки
+          const errorSample = errors.slice(0, 10).join('\n')
+          console.error('First 10 errors:', errorSample)
+
+          // Показываем детальное сообщение пользователю
+          Modal.error({
+            title: `Обнаружены ошибки в ${errors.length} строках`,
+            content: (
+              <div>
+                <p>Проверьте следующие ошибки:</p>
+                <ul style={{ maxHeight: '300px', overflow: 'auto' }}>
+                  {errors.slice(0, 20).map((error, idx) => (
+                    <li key={idx} style={{ fontSize: '12px', marginBottom: '4px' }}>
+                      {error}
+                    </li>
+                  ))}
+                  {errors.length > 20 && (
+                    <li style={{ fontSize: '12px', color: '#999' }}>
+                      ... и ещё {errors.length - 20} ошибок
+                    </li>
+                  )}
+                </ul>
+              </div>
+            ),
+            width: 600,
+          })
         }
 
         setImportData(parsedData)
         console.log('Excel parsed successfully', {
           action: 'excel_parsed',
           rowCount: parsedData.length,
+          errorCount: errors.length,
           timestamp: new Date().toISOString(),
         })
-        message.success(`Обработано ${parsedData.length} строк из Excel`)
+
+        if (parsedData.length > 0) {
+          message.success(
+            `Обработано ${parsedData.length} строк из Excel${errors.length > 0 ? ` (пропущено ${errors.length} строк с ошибками)` : ''}`
+          )
+        } else {
+          message.error('Не удалось обработать ни одной строки. Проверьте формат файла.')
+        }
       } catch (error) {
         console.error('Excel parsing error:', {
           error,
@@ -681,8 +889,146 @@ function Materials() {
       return
     }
 
+    // Проверка на дубликаты кодов внутри импортируемых данных
+    const importCodes = importData.map(item => item.code)
+    const duplicateCodesInImport = importCodes.filter(
+      (code, index) => importCodes.indexOf(code) !== index
+    )
+
+    if (duplicateCodesInImport.length > 0) {
+      console.error('Duplicate codes found in import data:', duplicateCodesInImport)
+      message.error(
+        `Обнаружены дубликаты кодов в импортируемых данных: ${[...new Set(duplicateCodesInImport)].join(', ')}. Исправьте коды в Excel файле.`
+      )
+      return
+    }
+
+    // Проверка на конфликт с существующими материалами
+    const existingCodes = materials.map(m => m.code)
+    const conflictingCodes = importData
+      .filter(item => existingCodes.includes(item.code))
+      .map(item => item.code)
+
+    if (conflictingCodes.length > 0) {
+      console.warn('Conflicting codes with existing materials:', conflictingCodes)
+
+      // Показываем модальное окно с выбором действия
+      Modal.confirm({
+        title: 'Обнаружены конфликты кодов',
+        content: (
+          <div>
+            <p>
+              Следующие коды уже существуют в базе данных ({conflictingCodes.length}{' '}
+              шт.):
+            </p>
+            <ul style={{ maxHeight: '200px', overflow: 'auto' }}>
+              {conflictingCodes.slice(0, 10).map((code, idx) => (
+                <li key={idx}>{code}</li>
+              ))}
+              {conflictingCodes.length > 10 && (
+                <li>... и ещё {conflictingCodes.length - 10} кодов</li>
+              )}
+            </ul>
+            <p>
+              <strong>Выберите действие:</strong>
+            </p>
+            <ul>
+              <li>
+                <strong>Пропустить дубликаты</strong> - импортировать только новые
+                материалы
+              </li>
+              <li>
+                <strong>Отмена</strong> - отменить импорт и исправить коды вручную
+              </li>
+            </ul>
+          </div>
+        ),
+        okText: 'Пропустить дубликаты',
+        cancelText: 'Отмена',
+        onOk: () => {
+          // Фильтруем импортируемые данные, убирая конфликтующие коды
+          const filteredData = importData.filter(
+            item => !existingCodes.includes(item.code)
+          )
+
+          console.log('Importing with duplicates filtered:', {
+            originalCount: importData.length,
+            filteredCount: filteredData.length,
+            skippedCount: conflictingCodes.length,
+            filteredDataSample: filteredData.slice(0, 3),
+          })
+
+          if (filteredData.length === 0) {
+            message.warning('Все материалы уже существуют в базе данных')
+            return
+          }
+
+          message.info(
+            `Импортируется ${filteredData.length} новых материалов (пропущено ${conflictingCodes.length} дубликатов)`
+          )
+
+          setIsImporting(true)
+          bulkImportMutation.mutate(filteredData)
+        },
+        onCancel: () => {
+          console.log('Import cancelled by user due to conflicts')
+          message.info('Импорт отменён')
+        },
+      })
+      return
+    }
+
     setIsImporting(true)
     bulkImportMutation.mutate(importData)
+  }
+
+  // Функция экспорта материалов в Excel
+  const handleExportMaterials = () => {
+    console.log('Export materials to Excel clicked', {
+      action: 'export_materials_excel',
+      materialsCount: materials.length,
+      timestamp: new Date().toISOString(),
+    })
+
+    try {
+      // Подготавливаем данные для экспорта с ПОЛНЫМ набором полей
+      // ВАЖНО: Категория экспортируется КАК КОД (например: brick, metal), а не как название
+      const exportData = materials.map(material => ({
+        'Код': material.code,
+        'Наименование': material.name,
+        'Описание': material.description || '',
+        'Категория': material.category, // Экспортируем КОД категории для обратного импорта
+        'Единица измерения': material.unit_name || '',
+        'Последняя цена': material.last_purchase_price || '',
+        'Поставщик': material.supplier || '',
+        'Артикул поставщика': material.supplier_article || '',
+        'Активность': material.is_active ? 'Да' : 'Нет',
+      }))
+
+      // Создаём рабочую книгу Excel
+      const worksheet = XLSX.utils.json_to_sheet(exportData)
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Материалы')
+
+      // Генерируем имя файла с текущей датой
+      const date = new Date().toISOString().split('T')[0]
+      const filename = `Материалы_${date}.xlsx`
+
+      // Сохраняем файл
+      XLSX.writeFile(workbook, filename)
+
+      message.success(`Экспортировано ${materials.length} материалов в файл ${filename}`)
+
+      console.log('Materials export successful', {
+        action: 'export_materials_success',
+        materialsCount: materials.length,
+        filename,
+        timestamp: new Date().toISOString(),
+      })
+    } catch (error) {
+      console.error('Export error:', error)
+      message.error(`Ошибка при экспорте: ${error}`)
+    }
   }
 
   const getCategoryConfig = (category: string) => {
@@ -870,13 +1216,47 @@ function Materials() {
           <Space size={12}>
             <Button
               size="large"
-              icon={<FileExcelOutlined />}
-              onClick={handleImportClick}
+              icon={<BarChartOutlined />}
+              onClick={() => {
+                console.log('Analytics button clicked', {
+                  action: 'analytics_button_click',
+                  timestamp: new Date().toISOString(),
+                })
+                setIsAnalyticsModalOpen(true)
+              }}
+              style={{
+                borderRadius: 10,
+                height: 44,
+                borderColor: '#8b5cf6',
+                color: '#8b5cf6',
+                fontWeight: 600,
+              }}
+            >
+              Аналитика цен
+            </Button>
+            <Button
+              size="large"
+              icon={<ExportOutlined />}
+              onClick={handleExportMaterials}
               style={{
                 borderRadius: 10,
                 height: 44,
                 borderColor: '#10b981',
                 color: '#10b981',
+                fontWeight: 600,
+              }}
+            >
+              Экспорт в Excel
+            </Button>
+            <Button
+              size="large"
+              icon={<FileExcelOutlined />}
+              onClick={handleImportClick}
+              style={{
+                borderRadius: 10,
+                height: 44,
+                borderColor: '#3b82f6',
+                color: '#3b82f6',
                 fontWeight: 600,
               }}
             >
@@ -1201,6 +1581,21 @@ function Materials() {
             </Col>
             <Col span={12}>
               <Form.Item
+                name="rate_category"
+                label="Категория расценки"
+                tooltip="При заполнении этого поля материал будет автоматически связан с расценками по подкатегории"
+                rules={[
+                  { max: 200, message: 'Максимальная длина 200 символов' },
+                ]}
+              >
+                <Input placeholder="Например: кирпич, вяжущие, арматура" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
                 name="last_purchase_price"
                 label="Последняя цена (₽)"
                 rules={[
@@ -1220,9 +1615,6 @@ function Materials() {
                 />
               </Form.Item>
             </Col>
-          </Row>
-
-          <Row gutter={16}>
             <Col span={12}>
               <Form.Item
                 name="supplier"
@@ -1234,6 +1626,9 @@ function Materials() {
                 <Input placeholder="Поставщик (опционально)" />
               </Form.Item>
             </Col>
+          </Row>
+
+          <Row gutter={16}>
             <Col span={12}>
               <Form.Item
                 name="supplier_article"
@@ -1488,6 +1883,19 @@ function Materials() {
           )}
         </Space>
       </Modal>
+
+      {/* Модальное окно аналитики цен материалов */}
+      <MaterialPriceAnalytics
+        visible={isAnalyticsModalOpen}
+        onClose={() => {
+          console.log('Analytics modal closed', {
+            action: 'analytics_modal_close',
+            timestamp: new Date().toISOString(),
+          })
+          setIsAnalyticsModalOpen(false)
+        }}
+        materials={materials}
+      />
     </div>
   )
 }

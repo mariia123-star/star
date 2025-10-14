@@ -4,6 +4,7 @@ export interface Material {
   name: string
   description?: string
   category: string
+  rate_category?: string // Категория расценки для автоматической связи с расценками
   unit_id: string
   last_purchase_price?: number
   supplier?: string
@@ -18,6 +19,7 @@ export interface MaterialCreate {
   name: string
   description?: string
   category: string
+  rate_category?: string // Категория расценки для автоматической связи с расценками
   unit_id: string
   last_purchase_price?: number
   supplier?: string
@@ -30,6 +32,7 @@ export interface MaterialUpdate {
   name?: string
   description?: string
   category?: string
+  rate_category?: string // Категория расценки для автоматической связи с расценками
   unit_id?: string
   last_purchase_price?: number
   supplier?: string

@@ -20,6 +20,8 @@ import {
   App,
   Popconfirm,
   DatePicker,
+  Upload,
+  Table,
 } from 'antd'
 import {
   PlusOutlined,
@@ -33,7 +35,9 @@ import {
   ExportOutlined,
   RightOutlined,
   DownOutlined,
+  UploadOutlined,
 } from '@ant-design/icons'
+import * as XLSX from 'xlsx'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ratesApi,
@@ -211,6 +215,9 @@ function Rates() {
   const [categoryFilter, setCategoryFilter] = useState<string>()
   const [rateGroups, setRateGroups] = useState<RateGroup[]>([])
   const [exportingGroup, setExportingGroup] = useState<string | null>(null)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [importData, setImportData] = useState<RateFormData[]>([])
+  const [isImporting, setIsImporting] = useState(false)
 
   const queryClient = useQueryClient()
   const logger = usePortalLogger()
@@ -994,6 +1001,236 @@ function Rates() {
     })
 
     deleteMutation.mutate(id)
+  }
+
+  // Функция экспорта расценок в Excel
+  const handleExportRates = () => {
+    console.log('Export rates to Excel clicked', {
+      action: 'export_rates_excel',
+      ratesCount: rates.length,
+      timestamp: new Date().toISOString(),
+    })
+
+    try {
+      // Подготавливаем данные для экспорта
+      const exportData = rates.map(rate => ({
+        'Код': rate.code,
+        'Наименование': rate.name,
+        'Описание': rate.description || '',
+        'Категория': rate.category || '',
+        'Подкатегория': rate.subcategory || '',
+        'Единица измерения': rate.unit_name || '',
+        'Базовая цена': rate.base_price,
+        'Активность': rate.is_active ? 'Да' : 'Нет',
+      }))
+
+      // Создаём рабочую книгу Excel
+      const worksheet = XLSX.utils.json_to_sheet(exportData)
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Расценки')
+
+      // Генерируем имя файла с текущей датой
+      const date = new Date().toISOString().split('T')[0]
+      const filename = `Расценки_${date}.xlsx`
+
+      // Сохраняем файл
+      XLSX.writeFile(workbook, filename)
+
+      message.success(`Экспортировано ${rates.length} расценок в файл ${filename}`)
+
+      logger.logButtonClick('Экспорт расценок в Excel', 'Сборник расценок', {
+        ratesCount: rates.length,
+        filename,
+      })
+    } catch (error) {
+      console.error('Export error:', error)
+      message.error(`Ошибка при экспорте: ${error}`)
+    }
+  }
+
+  // Функция открытия модального окна импорта
+  const handleImportClick = () => {
+    console.log('Import Excel clicked', {
+      action: 'import_excel',
+      timestamp: new Date().toISOString(),
+    })
+
+    logger.logButtonClick('Импорт расценок из Excel', 'Сборник расценок')
+    setIsImportModalOpen(true)
+  }
+
+  // Функция обработки загрузки Excel файла
+  // eslint-disable-next-line no-undef
+  const handleFileUpload = (file: File): boolean => {
+    console.log('File upload started', {
+      action: 'file_upload_start',
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+      timestamp: new Date().toISOString(),
+    })
+
+    // Проверка типа файла
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+    ]
+
+    if (!allowedTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls)$/i)) {
+      message.error('Пожалуйста, выберите файл в формате Excel (.xlsx или .xls)')
+      return false
+    }
+
+    // Проверка размера файла (максимум 10MB)
+    const maxFileSize = 10 * 1024 * 1024
+    if (file.size > maxFileSize) {
+      message.error('Размер файла не должен превышать 10MB')
+      return false
+    }
+
+    // eslint-disable-next-line no-undef
+    const reader = new FileReader()
+
+    reader.onerror = () => {
+      console.error('FileReader error:', reader.error)
+      message.error('Ошибка при чтении файла')
+    }
+
+    reader.onload = e => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer)
+        const workbook = XLSX.read(data, { type: 'array' })
+        const sheetName = workbook.SheetNames[0]
+        const worksheet = workbook.Sheets[sheetName]
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+
+        const parsedData: RateFormData[] = []
+        const errors: string[] = []
+
+        console.log('Excel file structure:', {
+          sheetName,
+          totalRows: jsonData.length,
+          firstRowData: jsonData[0],
+          timestamp: new Date().toISOString(),
+        })
+
+        for (let i = 1; i < jsonData.length; i++) {
+          const row = jsonData[i] as (string | number)[]
+          if (row.length === 0) continue
+
+          try {
+            const rowData: RateFormData = {
+              code: String(row[0] || '').trim(),
+              name: String(row[1] || '').trim(),
+              description: row[2] ? String(row[2]).trim() : undefined,
+              category: String(row[3] || '').trim(),
+              subcategory: row[4] ? String(row[4]).trim() : undefined,
+              unit_id: '', // Будет заполнено при импорте
+              base_price: typeof row[6] === 'number' ? row[6] : typeof row[6] === 'string' && !isNaN(Number(row[6])) ? Number(row[6]) : 0,
+              is_active: row[7] === 'Да' || row[7] === true,
+            }
+
+            // Валидация обязательных полей
+            if (!rowData.code) {
+              errors.push(`Строка ${i + 1}: отсутствует код расценки`)
+              continue
+            }
+            if (!rowData.name) {
+              errors.push(`Строка ${i + 1}: отсутствует наименование расценки`)
+              continue
+            }
+
+            parsedData.push(rowData)
+          } catch (error) {
+            errors.push(`Строка ${i + 1}: ошибка парсинга - ${error}`)
+            console.error(`Row ${i + 1} parsing error:`, error)
+          }
+        }
+
+        if (errors.length > 0) {
+          console.error('Excel parsing errors:', errors)
+          message.warning(
+            `Обнаружены ошибки в ${errors.length} строках. Проверьте консоль для подробностей.`
+          )
+        }
+
+        setImportData(parsedData)
+        console.log('Excel parsed successfully', {
+          action: 'excel_parsed',
+          rowCount: parsedData.length,
+          timestamp: new Date().toISOString(),
+        })
+        message.success(`Обработано ${parsedData.length} строк из Excel`)
+      } catch (error) {
+        console.error('Excel parsing error:', error)
+        message.error(`Ошибка при обработке Excel файла: ${error}`)
+        setImportData([])
+      }
+    }
+
+    reader.readAsArrayBuffer(file)
+    return false
+  }
+
+  // Функция закрытия модального окна импорта
+  const handleCloseImportModal = () => {
+    console.log('Import modal closed', {
+      action: 'import_modal_close',
+      timestamp: new Date().toISOString(),
+    })
+
+    setIsImportModalOpen(false)
+    setImportData([])
+    setIsImporting(false)
+  }
+
+  // Функция импорта расценок
+  const handleImport = async () => {
+    console.log('Import started', {
+      action: 'import_start',
+      itemCount: importData.length,
+      timestamp: new Date().toISOString(),
+    })
+
+    if (importData.length === 0) {
+      message.error('Нет данных для импорта')
+      return
+    }
+
+    setIsImporting(true)
+
+    try {
+      // Импортируем каждую расценку
+      for (const rateData of importData) {
+        // Найдём единицу измерения по имени
+        const unit = units.find(u =>
+          u.name === rateData.unit_id ||
+          u.short_name === rateData.unit_id
+        )
+
+        if (unit) {
+          rateData.unit_id = unit.id
+        } else {
+          // Если не нашли - используем первую доступную единицу
+          rateData.unit_id = units[0]?.id || ''
+        }
+
+        await ratesApi.create(rateData)
+      }
+
+      message.success(`Успешно импортировано ${importData.length} расценок`)
+      queryClient.invalidateQueries({ queryKey: ['rates'] })
+      handleCloseImportModal()
+
+      logger.logButtonClick('Импорт расценок завершен', 'Сборник расценок', {
+        importedCount: importData.length,
+      })
+    } catch (error) {
+      console.error('Import error:', error)
+      message.error(`Ошибка при импорте: ${error}`)
+    } finally {
+      setIsImporting(false)
+    }
   }
 
   // Функции для работы с блоками расценок (новый интерфейс)
@@ -2267,22 +2504,52 @@ function Rates() {
               </div>
             </div>
           </div>
-          <Button
-            type="primary"
-            size="large"
-            icon={<PlusOutlined />}
-            onClick={handleAddNewGroup}
-            style={{
-              borderRadius: 8,
-              height: 44,
-              paddingLeft: 24,
-              paddingRight: 24,
-              fontSize: 15,
-              fontWeight: 600,
-            }}
-          >
-            Добавить расценку
-          </Button>
+          <Space size={12}>
+            <Button
+              size="large"
+              icon={<ExportOutlined />}
+              onClick={handleExportRates}
+              style={{
+                borderRadius: 10,
+                height: 44,
+                borderColor: '#10b981',
+                color: '#10b981',
+                fontWeight: 600,
+              }}
+            >
+              Экспорт в Excel
+            </Button>
+            <Button
+              size="large"
+              icon={<DownloadOutlined />}
+              onClick={handleImportClick}
+              style={{
+                borderRadius: 10,
+                height: 44,
+                borderColor: '#3b82f6',
+                color: '#3b82f6',
+                fontWeight: 600,
+              }}
+            >
+              Импорт из Excel
+            </Button>
+            <Button
+              type="primary"
+              size="large"
+              icon={<PlusOutlined />}
+              onClick={handleAddNewGroup}
+              style={{
+                borderRadius: 8,
+                height: 44,
+                paddingLeft: 24,
+                paddingRight: 24,
+                fontSize: 15,
+                fontWeight: 600,
+              }}
+            >
+              Добавить расценку
+            </Button>
+          </Space>
         </div>
 
         {/* Современные фильтры */}
@@ -3379,6 +3646,73 @@ function Rates() {
             <Switch checkedChildren="Активен" unCheckedChildren="Неактивен" />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Модальное окно импорта расценок из Excel */}
+      <Modal
+        title="Импорт расценок из Excel"
+        open={isImportModalOpen}
+        onCancel={handleCloseImportModal}
+        footer={[
+          <Button key="cancel" onClick={handleCloseImportModal}>
+            Отмена
+          </Button>,
+          <Button
+            key="import"
+            type="primary"
+            loading={isImporting}
+            disabled={importData.length === 0}
+            onClick={handleImport}
+          >
+            Импортировать ({importData.length})
+          </Button>,
+        ]}
+        width={1000}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Upload
+            accept=".xlsx,.xls"
+            beforeUpload={handleFileUpload}
+            showUploadList={false}
+            multiple={false}
+            maxCount={1}
+          >
+            <Button icon={<UploadOutlined />}>Выберите Excel файл</Button>
+          </Upload>
+          <div style={{ marginTop: 8, color: '#666', fontSize: '12px' }}>
+            Формат: Код | Наименование | Описание | Категория | Подкатегория |
+            Единица измерения | Базовая цена | Активность
+          </div>
+        </div>
+
+        {importData.length > 0 && (
+          <Table
+            size="small"
+            dataSource={importData}
+            rowKey={(record, index) => `${record.code}_${index}`}
+            pagination={{ pageSize: 10 }}
+            columns={[
+              { title: 'Код', dataIndex: 'code', width: 100 },
+              { title: 'Наименование', dataIndex: 'name', ellipsis: true },
+              {
+                title: 'Категория',
+                dataIndex: 'category',
+                width: 150,
+              },
+              {
+                title: 'Подкатегория',
+                dataIndex: 'subcategory',
+                width: 150,
+              },
+              {
+                title: 'Цена',
+                dataIndex: 'base_price',
+                width: 100,
+                render: (price: number) => `${price.toFixed(2)} ₽`,
+              },
+            ]}
+          />
+        )}
       </Modal>
     </div>
   )

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useLocation } from 'react-router-dom'
 import {
   Button,
   Table,
@@ -72,6 +72,7 @@ const EstimateCalculatorDemo = () => {
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
   const [searchParams] = useSearchParams()
+  const location = useLocation()
   const estimateId = searchParams.get('estimateId') // ID сметы из URL
 
   const [coefficients, setCoefficients] =
@@ -113,6 +114,176 @@ const EstimateCalculatorDemo = () => {
 
   const [rows, setRows] = useState<EstimateRow[]>([])
   const [activeTab, setActiveTab] = useState<string>('calculator')
+
+  // Обработка импортированных данных из EstimateImport
+  useEffect(() => {
+    const importedData = location.state as {
+      importedRates?: Array<{
+        estimateItem: {
+          workName: string
+          unit: string
+          volume: number
+          subcategory?: string
+          category?: string
+          description?: string
+        }
+        rate: {
+          id: string
+          name: string
+          code: string
+          base_price: number
+          unit_name: string
+          subcategory?: string
+          category?: string
+        }
+        materials: Array<{
+          id: string
+          material_id: string
+          rate_id: string
+          consumption: number
+          unit_price: number
+          material?: {
+            id: string
+            code: string
+            name: string
+            description?: string
+            unit_id: string
+            unit_name: string
+            unit_short_name: string
+            last_purchase_price?: number
+            is_active: boolean
+          }
+        }>
+      }>
+      source?: string
+    } | null
+
+    if (!importedData?.importedRates || importedData.source !== 'estimate-import') {
+      return
+    }
+
+    console.log('📥 Обработка импортированных расценок из сметы', {
+      action: 'process_imported_rates',
+      count: importedData.importedRates.length,
+      timestamp: new Date().toISOString(),
+    })
+
+    const newRows: EstimateRow[] = []
+
+    importedData.importedRates.forEach((item, index) => {
+      const { estimateItem, rate, materials: rateMaterials } = item
+
+      // 1. Добавляем строку "Заказчик" с названием расценки из сборника
+      const customerRow: EstimateRow = {
+        id: `customer-${Date.now()}-${index}`,
+        materialType: '',
+        rowType: 'Заказчик',
+        workName: rate.name, // Название расценки из сборника
+        unit: rate.unit_name,
+        volume: estimateItem.volume,
+        materialCoef: 1,
+        workVolume: estimateItem.volume,
+        workPrice: rate.base_price,
+        matPriceNoDelivery: 0,
+        delivery: 0,
+        matPriceWithDelivery: 0,
+        rateId: rate.id,
+        rateName: rate.name,
+        rateCode: rate.code,
+      }
+
+      newRows.push(customerRow)
+
+      console.log('👤 Добавлена строка Заказчик', {
+        rateName: rate.name,
+        rateCode: rate.code,
+        volume: estimateItem.volume,
+        price: rate.base_price,
+      })
+
+      // 2. Добавляем строку "раб" с наименованием работы из Excel
+      const workRow: EstimateRow = {
+        id: `work-${Date.now()}-${index}`,
+        materialType: 'раб',
+        rowType: 'раб',
+        workName: estimateItem.workName, // Наименование работы из Excel
+        unit: estimateItem.unit,
+        volume: estimateItem.volume,
+        materialCoef: 1,
+        workVolume: estimateItem.volume,
+        workPrice: rate.base_price,
+        matPriceNoDelivery: 0,
+        delivery: 0,
+        matPriceWithDelivery: 0,
+      }
+
+      newRows.push(workRow)
+
+      console.log('🔨 Добавлена строка работы', {
+        workName: estimateItem.workName,
+        volume: estimateItem.volume,
+      })
+
+      // 3. Добавляем материалы из расценки
+      if (rateMaterials && rateMaterials.length > 0) {
+        rateMaterials.forEach((rateMaterial, matIndex) => {
+          if (!rateMaterial.materials) {
+            console.warn('Материал не найден для rate_material', rateMaterial.id)
+            return
+          }
+
+          const material = rateMaterial.materials
+          const unit = material.units
+
+          // Используем last_purchase_price из материала или unit_price из связи
+          const materialPrice = material.last_purchase_price || rateMaterial.unit_price || 0
+
+          const materialRow: EstimateRow = {
+            id: `material-${Date.now()}-${index}-${matIndex}`,
+            materialType: 'основ', // Основной материал - будет показан в "Мат в КП"
+            rowType: 'мат',
+            workName: material.name,
+            unit: unit?.name || 'шт',
+            volume: estimateItem.volume,
+            materialCoef: rateMaterial.consumption, // Используем consumption вместо quantity
+            workVolume: estimateItem.volume * rateMaterial.consumption,
+            workPrice: 0,
+            matPriceNoDelivery: materialPrice,
+            delivery: 0,
+            matPriceWithDelivery: materialPrice,
+            materialId: material.id,
+          }
+
+          newRows.push(materialRow)
+
+          console.log('🧱 Добавлен материал', {
+            materialName: material.name,
+            consumption: rateMaterial.consumption,
+            price: materialPrice,
+            unit: unit?.name || 'шт',
+          })
+        })
+      } else {
+        console.log('⚠️ Нет материалов для расценки', {
+          rateId: rate.id,
+          rateName: rate.name,
+        })
+      }
+    })
+
+    setRows(newRows)
+    message.success(`Импортировано ${importedData.importedRates.length} расценок с материалами`)
+
+    console.log('✅ Импорт завершен', {
+      action: 'import_completed',
+      totalRows: newRows.length,
+      ratesCount: importedData.importedRates.length,
+      timestamp: new Date().toISOString(),
+    })
+
+    // Очищаем state чтобы избежать повторной обработки
+    window.history.replaceState({}, document.title)
+  }, [location.state])
 
   const addRow = () => {
     // Ищем последнюю строку "Заказчик" для получения объема
@@ -245,6 +416,55 @@ const EstimateCalculatorDemo = () => {
               parseFloat(String(field === 'delivery' ? value : row.delivery)) ||
               0
             updated.matPriceWithDelivery = price + delivery
+
+            // Автоматическое обновление цены материала в БД при изменении цены
+            if (
+              field === 'matPriceNoDelivery' &&
+              row.materialId &&
+              (row.rowType === 'мат' || row.rowType === 'суб-мат')
+            ) {
+              const newPrice = parseFloat(String(value)) || 0
+              const materialName = row.workName || 'Неизвестный материал'
+
+              console.log('💰 Обновление цены материала в БД', {
+                materialId: row.materialId,
+                materialName,
+                oldPrice: row.matPriceNoDelivery,
+                newPrice,
+                timestamp: new Date().toISOString(),
+              })
+
+              // Асинхронное обновление цены в БД с сохранением истории
+              materialsApi
+                .updatePriceWithHistory(
+                  row.materialId,
+                  newPrice,
+                  'estimate_calculator',
+                  `Обновлено из калькулятора смет: ${materialName}`
+                )
+                .then(() => {
+                  console.log('✅ Цена материала обновлена в БД', {
+                    materialId: row.materialId,
+                    materialName,
+                    newPrice,
+                    timestamp: new Date().toISOString(),
+                  })
+                  message.success(
+                    `Цена материала "${materialName}" обновлена: ${newPrice.toFixed(2)} ₽`
+                  )
+                })
+                .catch(error => {
+                  console.error('❌ Ошибка обновления цены материала', {
+                    materialId: row.materialId,
+                    materialName,
+                    error,
+                    timestamp: new Date().toISOString(),
+                  })
+                  message.error(
+                    `Не удалось обновить цену материала "${materialName}" в справочнике`
+                  )
+                })
+            }
           }
 
           return updated
