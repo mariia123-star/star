@@ -228,7 +228,7 @@ const EstimateCalculatorDemo = () => {
       if (rateMaterials && rateMaterials.length > 0) {
         rateMaterials.forEach((rateMaterial, matIndex) => {
           if (!rateMaterial.materials) {
-            console.warn('Материал не найден для rate_material', rateMaterial.id)
+            // Материал удален или недоступен - пропускаем
             return
           }
 
