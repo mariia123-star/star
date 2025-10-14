@@ -18,6 +18,7 @@ import {
   CalculatorOutlined,
   RocketOutlined,
 } from '@ant-design/icons'
+import { ZoomControl } from '@/shared/ui'
 
 const { Header, Sider, Content } = Layout
 const { Title } = Typography
@@ -300,7 +301,17 @@ function MainLayout({ children }: MainLayoutProps) {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <ZoomControl showLabel={false} size="small" />
+
+            <div
+              style={{
+                width: 1,
+                height: 24,
+                background: '#e8e8e8',
+              }}
+            />
+
             <div
               style={{
                 padding: '4px 12px',
