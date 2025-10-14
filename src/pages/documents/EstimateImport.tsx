@@ -38,6 +38,7 @@ import {
   findMatchingRates,
   getMatchQuality,
   formatMatchInfo,
+  validateEstimateRow,
   type EstimateRow,
   type RateMatchResult,
   type Rate,
@@ -53,11 +54,13 @@ interface ProcessedEstimateRow extends EstimateRow {
     | 'good_match'
     | 'needs_review'
     | 'no_match'
+    | 'validation_error'
   selectedRateId?: string
   selectedRateName?: string
   selectedRateCode?: string
   matches?: RateMatchResult[]
   matchScore?: number
+  validationErrors?: string[]
 }
 
 function EstimateImport() {
@@ -148,17 +151,17 @@ function EstimateImport() {
               status: 'pending',
             }
 
-            // Валидация обязательных полей
-            if (!estimateRow.workName) {
-              console.warn(`Строка ${i + 1}: отсутствует наименование работ`)
-              continue
-            }
-            if (!estimateRow.unit) {
-              console.warn(`Строка ${i + 1}: отсутствует единица измерения`)
-              continue
-            }
-            if (!estimateRow.volume || estimateRow.volume <= 0) {
-              console.warn(`Строка ${i + 1}: некорректный объём`)
+            // Валидация обязательных полей с новыми правилами
+            const validation = validateEstimateRow(estimateRow)
+
+            if (!validation.isValid) {
+              console.warn(`Строка ${i + 1}: ошибки валидации`, validation.errors)
+              // Добавляем строку с ошибками валидации
+              parsedData.push({
+                ...estimateRow,
+                status: 'validation_error',
+                validationErrors: validation.errors,
+              })
               continue
             }
 
@@ -216,7 +219,14 @@ function EstimateImport() {
       // Имитация асинхронности для отображения прогресса
       await new Promise(resolve => setTimeout(resolve, 10)) // eslint-disable-line no-undef
 
-      // Поиск подходящих расценок
+      // Пропускаем строки с ошибками валидации
+      if (item.status === 'validation_error') {
+        processedData.push(item)
+        setProcessedCount(i + 1)
+        continue
+      }
+
+      // Поиск подходящих расценок (минимум 50% совпадение по наименованию)
       const matches = findMatchingRates(item, activeRates, 0.5)
 
       let status: ProcessedEstimateRow['status'] = 'no_match'
@@ -517,6 +527,8 @@ function EstimateImport() {
         return <Tag icon={<WarningOutlined />} color="warning">Требует проверки</Tag>
       case 'no_match':
         return <Tag icon={<CloseCircleOutlined />} color="default">Без совпадений</Tag>
+      case 'validation_error':
+        return <Tag icon={<CloseCircleOutlined />} color="error">Ошибка валидации</Tag>
       default:
         return <Tag icon={<InfoCircleOutlined />} color="default">Ожидает</Tag>
     }
@@ -569,6 +581,19 @@ function EstimateImport() {
       key: 'rate',
       ellipsis: true,
       render: (_: unknown, record: ProcessedEstimateRow) => {
+        // Показываем ошибки валидации
+        if (record.status === 'validation_error' && record.validationErrors) {
+          return (
+            <div>
+              {record.validationErrors.map((error, idx) => (
+                <div key={idx} style={{ color: '#ff4d4f', fontSize: 12 }}>
+                  ⚠️ {error}
+                </div>
+              ))}
+            </div>
+          )
+        }
+
         if (record.selectedRateName) {
           return (
             <div>
@@ -673,12 +698,28 @@ function EstimateImport() {
                 <li>Столбец 1: <strong>Наименование работ</strong> (обязательно)</li>
                 <li>Столбец 2: <strong>Ед.изм.</strong> (обязательно)</li>
                 <li>Столбец 3: <strong>Объем</strong> (обязательно)</li>
-                <li>Столбец 4: <strong>Подкатегория</strong> (рекомендуется для лучшего подбора)</li>
+                <li>Столбец 4: <strong>Подкатегория</strong> (❗ ОБЯЗАТЕЛЬНО)</li>
                 <li>Столбец 5: <strong>Категория</strong> (опционально)</li>
                 <li>Столбец 6: <strong>Описание</strong> (опционально)</li>
               </ul>
-              <Paragraph style={{ marginBottom: 0 }}>
-                <strong>Совет:</strong> Заполнение подкатегории значительно улучшает качество автоматического подбора расценок!
+              <Alert
+                message="Новые правила сопоставления"
+                description={
+                  <div>
+                    <div>✓ <strong>Подкатегория</strong> - ОБЯЗАТЕЛЬНА, должна совпадать на 100%</div>
+                    <div>✓ <strong>Категория</strong> (если указана) - должна совпадать на 100%</div>
+                    <div>✓ <strong>Наименование</strong> - допускается совпадение от 50% до 100%</div>
+                    <div style={{ marginTop: 4, color: '#1890ff' }}>
+                      💡 При низком совпадении по наименованию вы сможете вручную выбрать нужную расценку
+                    </div>
+                  </div>
+                }
+                type="warning"
+                showIcon
+                style={{ marginTop: 12 }}
+              />
+              <Paragraph style={{ marginBottom: 0, marginTop: 12 }}>
+                <strong>Важно:</strong> Без указания подкатегории строка будет отмечена как ошибочная!
               </Paragraph>
             </div>
           }
