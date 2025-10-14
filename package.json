@@ -21,6 +21,7 @@
     "cors": "^2.8.5",
     "dayjs": "^1.11.0",
     "express": "^5.1.0",
+    "fuzzball": "^2.2.3",
     "jspdf": "^3.0.2",
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.544.0",

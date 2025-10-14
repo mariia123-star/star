@@ -47,7 +47,9 @@
       "Bash(git commit:*)",
       "Bash(GIT_SSH_COMMAND=\"ssh -i ~/.ssh/id_rsa_github -o IdentitiesOnly=yes\" git push origin main)",
       "Bash(gh auth:*)",
-      "Read(//c/Users/pto125/**)"
+      "Read(//c/Users/pto125/**)",
+      "Bash(chmod:*)",
+      "Bash(GIT_SSH_COMMAND=\"ssh -i ~/.ssh/id_ed25519_github -o IdentitiesOnly=yes\" git push origin main)"
     ],
     "deny": [],
     "ask": []
